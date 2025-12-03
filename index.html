@@ -1,58 +1,33 @@
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <title>UPM Clock Remote</title>
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <link rel="manifest" href="manifest.json">
-</head>
-<body>
-  <h1>UPM Clock Remote</h1>
-  <p>Commands will be sent to your browser running Tampermonkey.</p>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
 
-  <div id="status" style="margin-bottom:10px;font-family:sans-serif;"></div>
+<script>
+  // Now these are loaded from config.js:
+  // SUPABASE_URL
+  // SUPABASE_ANON_KEY
+  // DEVICE_ID
 
-  <button onclick="sendCmd('clockin')">Clock IN</button>
-  <button onclick="sendCmd('clockout')">Clock OUT</button>
-  <button onclick="sendCmd('status')">Status</button>
-  <br><br>
-  <button onclick="sendCmd('skip')">Skip Today</button>
-  <button onclick="sendCmd('unskip')">Unskip Today</button>
-  <button onclick="sendCmd('skipnext')">Skip Tomorrow</button>
-  <button onclick="sendCmd('unskipnext')">Unskip Tomorrow</button>
-  <br><br>
-  <button onclick="sendCmd('refresh')">Refresh Page</button>
-  <button onclick="sendCmd('hardreset')">Hard Reset</button>
+  const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  const statusEl = document.getElementById("status");
+  
+  function setStatus(msg) { statusEl.textContent = msg; }
 
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script>
-    // TODO: replace with your actual values:
-    const SUPABASE_URL = "https://ibffzsceydkhpwwttfjq.supabase.co";
-    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImliZmZ6c2NleWRraHB3d3R0ZmpxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ3MzQyNzEsImV4cCI6MjA4MDMxMDI3MX0.YudIJ3aVEmHUr_KHEDPuHkU0VtlcvyYsOwmSLkLoZgU";
-    const DEVICE_ID = "desktop-resq"; // the browser that Tampermonkey runs in
+  async function sendCmd(cmd, args = {}) {
+    setStatus("Sending: " + cmd + " …");
 
-    const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const { error } = await sb.from("commands").insert([
+      { device_id: DEVICE_ID, cmd, args }
+    ]);
 
-    const statusEl = document.getElementById('status');
-    function setStatus(msg) { statusEl.textContent = msg; }
-
-    async function sendCmd(cmd, args = {}) {
-      setStatus("Sending: " + cmd + " …");
-      const { error } = await sb.from('commands').insert([
-        { device_id: DEVICE_ID, cmd, args }
-      ]);
-      if (error) {
-        console.error(error);
-        setStatus("Error: " + error.message);
-      } else {
-        setStatus("Sent: " + cmd + " at " + new Date().toLocaleTimeString());
-      }
+    if (error) {
+      console.error(error);
+      setStatus("❌ Error: " + error.message);
+    } else {
+      setStatus("✔️ Sent: " + cmd + " at " + new Date().toLocaleTimeString());
     }
+  }
 
-    // Optional: simple PWA install
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('sw.js').catch(console.error);
-    }
-  </script>
-</body>
-</html>
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("sw.js").catch(console.error);
+  }
+</script>
