@@ -1,4 +1,4 @@
-const CACHE_NAME = 'upm-clock-remote-v1';
+const CACHE_NAME = 'upm-clock-remote-v2';
 const ASSETS = [
   './',
   './index.html',
