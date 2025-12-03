@@ -28,52 +28,72 @@
         <div id="status-log" class="status-log"></div>
       </div>
 
-      <!-- CLOCK CONTROLS: STATUS BUTTON FIRST -->
-      <section class="card">
-        <h2>Clock Controls</h2>
+      <!-- TAB CONTENT: CONTROL -->
+      <section id="tab-control" class="tab-pane">
+        <section class="card">
+          <h2>Clock Controls</h2>
 
-        <button class="btn primary" onclick="sendCmd('status')">
-          Status
-        </button>
+          <!-- STATUS BUTTON FIRST -->
+          <button class="btn primary" onclick="sendCmd('status')">
+            Status
+          </button>
 
-        <button class="btn primary" onclick="sendCmd('clockin')">
-          Clock IN
-        </button>
+          <button class="btn primary" onclick="sendCmd('clockin')">
+            Clock IN
+          </button>
 
-        <button class="btn primary" onclick="sendCmd('clockout')">
-          Clock OUT
-        </button>
+          <button class="btn primary" onclick="sendCmd('clockout')">
+            Clock OUT
+          </button>
+        </section>
+
+        <section class="card">
+          <h2>Skip Controls</h2>
+
+          <button class="btn warning" onclick="sendCmd('skip')">
+            Skip Today
+          </button>
+          <button class="btn warning" onclick="sendCmd('unskip')">
+            Unskip Today
+          </button>
+
+          <button class="btn warning" onclick="sendCmd('skipnext')">
+            Skip Tomorrow
+          </button>
+          <button class="btn warning" onclick="sendCmd('unskipnext')">
+            Unskip Tomorrow
+          </button>
+        </section>
+
+        <section class="card">
+          <h2>System</h2>
+
+          <button class="btn danger" onclick="sendCmd('refresh')">
+            Refresh Page
+          </button>
+          <button class="btn danger" onclick="sendCmd('hardreset')">
+            Hard Reset
+          </button>
+        </section>
       </section>
 
-      <section class="card">
-        <h2>Skip Controls</h2>
-
-        <button class="btn warning" onclick="sendCmd('skip')">
-          Skip Today
-        </button>
-        <button class="btn warning" onclick="sendCmd('unskip')">
-          Unskip Today
-        </button>
-
-        <button class="btn warning" onclick="sendCmd('skipnext')">
-          Skip Tomorrow
-        </button>
-        <button class="btn warning" onclick="sendCmd('unskipnext')">
-          Unskip Tomorrow
-        </button>
-      </section>
-
-      <section class="card">
-        <h2>System</h2>
-
-        <button class="btn danger" onclick="sendCmd('refresh')">
-          Refresh Page
-        </button>
-        <button class="btn danger" onclick="sendCmd('hardreset')">
-          Hard Reset
-        </button>
+      <!-- TAB CONTENT: HISTORY -->
+      <section id="tab-history" class="tab-pane hidden">
+        <section class="card">
+          <h2>Response History (last 24h)</h2>
+          <div id="history-list" class="history-list"></div>
+        </section>
       </section>
     </main>
+
+    <!-- Bottom tab bar -->
+    <nav class="tab-bar">
+      <button class="tab-button active" data-tab="control">Control</button>
+      <button class="tab-button" data-tab="history">History</button>
+    </nav>
+
+    <!-- Toast popup -->
+    <div id="toast" class="toast"></div>
 
     <script>
       // Supabase client
@@ -81,6 +101,9 @@
 
       const statusMainEl = document.getElementById("status-main");
       const statusLogEl = document.getElementById("status-log");
+      const historyListEl = document.getElementById("history-list");
+      const toastEl = document.getElementById("toast");
+      let toastTimeout = null;
 
       function setStatusMain(msg) {
         statusMainEl.textContent = msg;
@@ -94,6 +117,15 @@
         statusLogEl.prepend(row); // newest first
       }
 
+      function showToast(msg) {
+        toastEl.textContent = msg;
+        toastEl.classList.add("show");
+        if (toastTimeout) clearTimeout(toastTimeout);
+        toastTimeout = setTimeout(() => {
+          toastEl.classList.remove("show");
+        }, 3000);
+      }
+
       async function sendCmd(cmd, args = {}) {
         setStatusMain("Sending: " + cmd + " …");
 
@@ -101,21 +133,93 @@
           .from("commands")
           .insert([{ device_id: DEVICE_ID, cmd, args }])
           .select()
-          .single(); // get the inserted row
+          .single(); // get inserted row
 
         if (error) {
           console.error(error);
           setStatusMain("❌ Error: " + error.message);
           appendStatusLog("Error sending " + cmd);
+          showToast("Error sending " + cmd);
         } else {
           setStatusMain(
             "✔️ Sent: " + cmd + " at " + new Date().toLocaleTimeString()
           );
           appendStatusLog("Command sent: " + cmd);
+          // Optionally: show quick toast that it's sent; response will show in realtime
+          showToast("Sent: " + cmd);
         }
       }
 
-      // Realtime: listen for responses/acks from Tampermonkey
+      // Load history (past 24h)
+      async function loadHistory() {
+        const sinceIso = new Date(
+          Date.now() - 24 * 60 * 60 * 1000
+        ).toISOString();
+
+        const { data, error } = await sb
+          .from("commands")
+          .select("id, cmd, response, created_at, ack_at")
+          .eq("device_id", DEVICE_ID)
+          .gte("created_at", sinceIso)
+          .order("created_at", { ascending: false })
+          .limit(50);
+
+        historyListEl.innerHTML = "";
+
+        if (error) {
+          console.error(error);
+          historyListEl.textContent = "Error loading history.";
+          return;
+        }
+
+        if (!data || data.length === 0) {
+          historyListEl.textContent = "No responses in the last 24 hours.";
+          return;
+        }
+
+        data.forEach((row) => {
+          const item = document.createElement("div");
+          item.className = "history-item";
+
+          const cmd = (row.cmd || "").toUpperCase();
+          const created = row.created_at
+            ? new Date(row.created_at).toLocaleTimeString()
+            : "";
+          const resp = row.response || "(no response yet)";
+
+          item.innerHTML = `
+            <div class="history-top">
+              <span class="history-cmd">${cmd}</span>
+              <span class="history-time">${created}</span>
+            </div>
+            <div class="history-response">${resp}</div>
+          `;
+
+          historyListEl.appendChild(item);
+        });
+      }
+
+      // Handle realtime updates from Supabase (command responses)
+      function handleUpdateRow(row) {
+        if (!row) return;
+        const tag = row.cmd ? row.cmd.toUpperCase() : "CMD";
+
+        if (row.response) {
+          setStatusMain(row.response);
+          appendStatusLog("[" + tag + "] " + row.response);
+          showToast(row.response);
+          // If user is on history tab, refresh list
+          const historyVisible = !document
+            .getElementById("tab-history")
+            .classList.contains("hidden");
+          if (historyVisible) {
+            loadHistory();
+          }
+        } else if (row.ack_at) {
+          appendStatusLog("[" + tag + "] acknowledged");
+        }
+      }
+
       const channel = sb
         .channel("command_responses_" + DEVICE_ID)
         .on(
@@ -127,16 +231,7 @@
             filter: `device_id=eq.${DEVICE_ID}`,
           },
           (payload) => {
-            const row = payload.new;
-            if (!row) return;
-            const tag = row.cmd ? row.cmd.toUpperCase() : "CMD";
-
-            if (row.response) {
-              setStatusMain(row.response);
-              appendStatusLog("[" + tag + "] " + row.response);
-            } else if (row.ack_at) {
-              appendStatusLog("[" + tag + "] acknowledged");
-            }
+            handleUpdateRow(payload.new);
           }
         )
         .subscribe();
@@ -164,12 +259,40 @@
         });
       }
 
-      // Service worker + ripples
+      // Tabs: Control / History
+      function initTabs() {
+        const buttons = document.querySelectorAll(".tab-button");
+        const tabControl = document.getElementById("tab-control");
+        const tabHistory = document.getElementById("tab-history");
+
+        buttons.forEach((btn) => {
+          btn.addEventListener("click", () => {
+            buttons.forEach((b) => b.classList.remove("active"));
+            btn.classList.add("active");
+
+            const tab = btn.dataset.tab;
+            if (tab === "control") {
+              tabControl.classList.remove("hidden");
+              tabHistory.classList.add("hidden");
+            } else if (tab === "history") {
+              tabControl.classList.add("hidden");
+              tabHistory.classList.remove("hidden");
+              loadHistory();
+            }
+          });
+        });
+      }
+
+      // Service worker + init
       if ("serviceWorker" in navigator) {
         navigator.serviceWorker.register("sw.js").catch(console.error);
       }
 
-      window.addEventListener("load", initRipples);
+      window.addEventListener("load", () => {
+        initRipples();
+        initTabs();
+        loadHistory(); // preload for when user switches to History tab
+      });
     </script>
   </body>
 </html>
