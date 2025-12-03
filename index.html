@@ -22,29 +22,39 @@
     </header>
 
     <main>
+      <!-- STATUS CARD AT TOP -->
       <div class="status-card">
-        <div id="status">Ready</div>
+        <div id="status-main" class="status-main">Ready</div>
+        <div id="status-log" class="status-log"></div>
       </div>
 
+      <!-- CLOCK CONTROLS: STATUS BUTTON FIRST -->
       <section class="card">
         <h2>Clock Controls</h2>
+
+        <button class="btn primary" onclick="sendCmd('status')">
+          Status
+        </button>
+
         <button class="btn primary" onclick="sendCmd('clockin')">
           Clock IN
         </button>
+
         <button class="btn primary" onclick="sendCmd('clockout')">
           Clock OUT
         </button>
-        <button class="btn" onclick="sendCmd('status')">Status</button>
       </section>
 
       <section class="card">
         <h2>Skip Controls</h2>
+
         <button class="btn warning" onclick="sendCmd('skip')">
           Skip Today
         </button>
         <button class="btn warning" onclick="sendCmd('unskip')">
           Unskip Today
         </button>
+
         <button class="btn warning" onclick="sendCmd('skipnext')">
           Skip Tomorrow
         </button>
@@ -55,6 +65,7 @@
 
       <section class="card">
         <h2>System</h2>
+
         <button class="btn danger" onclick="sendCmd('refresh')">
           Refresh Page
         </button>
@@ -65,33 +76,100 @@
     </main>
 
     <script>
+      // Supabase client
       const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-      const statusEl = document.getElementById("status");
 
-      function setStatus(msg) {
-        statusEl.textContent = msg;
+      const statusMainEl = document.getElementById("status-main");
+      const statusLogEl = document.getElementById("status-log");
+
+      function setStatusMain(msg) {
+        statusMainEl.textContent = msg;
+      }
+
+      function appendStatusLog(msg) {
+        const row = document.createElement("div");
+        row.className = "status-log-item";
+        row.textContent =
+          new Date().toLocaleTimeString() + " — " + msg;
+        statusLogEl.prepend(row); // newest first
       }
 
       async function sendCmd(cmd, args = {}) {
-        setStatus("Sending: " + cmd + " …");
+        setStatusMain("Sending: " + cmd + " …");
 
-        const { error } = await sb.from("commands").insert([
-          { device_id: DEVICE_ID, cmd, args },
-        ]);
+        const { data, error } = await sb
+          .from("commands")
+          .insert([{ device_id: DEVICE_ID, cmd, args }])
+          .select()
+          .single(); // get the inserted row
 
         if (error) {
           console.error(error);
-          setStatus("❌ Error: " + error.message);
+          setStatusMain("❌ Error: " + error.message);
+          appendStatusLog("Error sending " + cmd);
         } else {
-          setStatus(
+          setStatusMain(
             "✔️ Sent: " + cmd + " at " + new Date().toLocaleTimeString()
           );
+          appendStatusLog("Command sent: " + cmd);
         }
       }
 
+      // Realtime: listen for responses/acks from Tampermonkey
+      const channel = sb
+        .channel("command_responses_" + DEVICE_ID)
+        .on(
+          "postgres_changes",
+          {
+            event: "UPDATE",
+            schema: "public",
+            table: "commands",
+            filter: `device_id=eq.${DEVICE_ID}`,
+          },
+          (payload) => {
+            const row = payload.new;
+            if (!row) return;
+            const tag = row.cmd ? row.cmd.toUpperCase() : "CMD";
+
+            if (row.response) {
+              setStatusMain(row.response);
+              appendStatusLog("[" + tag + "] " + row.response);
+            } else if (row.ack_at) {
+              appendStatusLog("[" + tag + "] acknowledged");
+            }
+          }
+        )
+        .subscribe();
+
+      // One UI–style ripple effect for buttons
+      function initRipples() {
+        document.querySelectorAll(".btn").forEach((btn) => {
+          btn.addEventListener("click", function (e) {
+            const rect = this.getBoundingClientRect();
+            const size = Math.max(rect.width, rect.height);
+            const ripple = document.createElement("span");
+            ripple.className = "ripple";
+            ripple.style.width = ripple.style.height = size + "px";
+            ripple.style.left =
+              e.clientX - rect.left - size / 2 + "px";
+            ripple.style.top =
+              e.clientY - rect.top - size / 2 + "px";
+
+            const existing = this.querySelector(".ripple");
+            if (existing) existing.remove();
+            this.appendChild(ripple);
+
+            setTimeout(() => ripple.remove(), 600);
+          });
+        });
+      }
+
+      // Service worker + ripples
       if ("serviceWorker" in navigator) {
         navigator.serviceWorker.register("sw.js").catch(console.error);
       }
+
+      window.addEventListener("load", initRipples);
     </script>
   </body>
 </html>
