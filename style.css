@@ -1,4 +1,4 @@
-/* --- One UI 8 Inspired Style --- */
+/* --- One UI 8 Inspired Style + Ripples + Status Log --- */
 
 :root {
   --bg: #f7f7f9;
@@ -57,6 +57,35 @@ body {
   box-shadow: var(--shadow-soft);
 }
 
+/* Status card */
+
+.status-main {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+
+.status-log {
+  max-height: 160px;
+  overflow-y: auto;
+  border-radius: 16px;
+  background: #f0f1f5;
+  padding: 8px 10px;
+}
+
+.status-log-item {
+  font-size: 13px;
+  color: var(--text-muted);
+  padding: 4px 0;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.25);
+}
+
+.status-log-item:last-child {
+  border-bottom: none;
+}
+
+/* Card titles */
+
 .card h2 {
   margin-top: 0;
   margin-bottom: 16px;
@@ -64,15 +93,12 @@ body {
   font-weight: 600;
 }
 
-#status {
-  font-size: 16px;
-  color: var(--text-main);
-  font-weight: 500;
-}
-
 /* Buttons */
 
 .btn {
+  position: relative;
+  overflow: hidden;
+
   width: 100%;
   padding: 14px 16px;
   margin-bottom: 12px;
@@ -93,17 +119,38 @@ body {
   opacity: 0.9;
 }
 
+/* Primary (blue) */
 .btn.primary {
   background: var(--primary);
   color: #fff;
 }
 
+/* Warning (yellow) */
 .btn.warning {
   background: var(--warning);
   color: #fff;
 }
 
+/* Danger (red) */
 .btn.danger {
   background: var(--danger);
   color: #fff;
+}
+
+/* Ripple effect */
+
+.ripple {
+  position: absolute;
+  border-radius: 50%;
+  transform: scale(0);
+  animation: ripple 0.6s linear;
+  background-color: rgba(255, 255, 255, 0.4);
+  pointer-events: none;
+}
+
+@keyframes ripple {
+  to {
+    transform: scale(4);
+    opacity: 0;
+  }
 }
