@@ -1,33 +1,97 @@
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="config.js"></script>
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>UPM Clock Remote</title>
+    <meta
+      name="viewport"
+      content="width=device-width,initial-scale=1,maximum-scale=1"
+    />
+    <link rel="manifest" href="manifest.json" />
+    <link rel="stylesheet" href="style.css" />
 
-<script>
-  // Now these are loaded from config.js:
-  // SUPABASE_URL
-  // SUPABASE_ANON_KEY
-  // DEVICE_ID
+    <!-- Supabase + config -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="config.js"></script>
+  </head>
 
-  const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-  const statusEl = document.getElementById("status");
-  
-  function setStatus(msg) { statusEl.textContent = msg; }
+  <body>
+    <header class="topbar">
+      <h1>UPM Clock Remote</h1>
+      <p class="subtitle">Control panel for your automated UPM clock-in/out</p>
+    </header>
 
-  async function sendCmd(cmd, args = {}) {
-    setStatus("Sending: " + cmd + " …");
+    <main>
+      <div class="status-card">
+        <div id="status">Ready</div>
+      </div>
 
-    const { error } = await sb.from("commands").insert([
-      { device_id: DEVICE_ID, cmd, args }
-    ]);
+      <section class="card">
+        <h2>Clock Controls</h2>
+        <button class="btn primary" onclick="sendCmd('clockin')">
+          Clock IN
+        </button>
+        <button class="btn primary" onclick="sendCmd('clockout')">
+          Clock OUT
+        </button>
+        <button class="btn" onclick="sendCmd('status')">Status</button>
+      </section>
 
-    if (error) {
-      console.error(error);
-      setStatus("❌ Error: " + error.message);
-    } else {
-      setStatus("✔️ Sent: " + cmd + " at " + new Date().toLocaleTimeString());
-    }
-  }
+      <section class="card">
+        <h2>Skip Controls</h2>
+        <button class="btn warning" onclick="sendCmd('skip')">
+          Skip Today
+        </button>
+        <button class="btn warning" onclick="sendCmd('unskip')">
+          Unskip Today
+        </button>
+        <button class="btn warning" onclick="sendCmd('skipnext')">
+          Skip Tomorrow
+        </button>
+        <button class="btn warning" onclick="sendCmd('unskipnext')">
+          Unskip Tomorrow
+        </button>
+      </section>
 
-  if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.register("sw.js").catch(console.error);
-  }
-</script>
+      <section class="card">
+        <h2>System</h2>
+        <button class="btn danger" onclick="sendCmd('refresh')">
+          Refresh Page
+        </button>
+        <button class="btn danger" onclick="sendCmd('hardreset')">
+          Hard Reset
+        </button>
+      </section>
+    </main>
+
+    <script>
+      const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+      const statusEl = document.getElementById("status");
+
+      function setStatus(msg) {
+        statusEl.textContent = msg;
+      }
+
+      async function sendCmd(cmd, args = {}) {
+        setStatus("Sending: " + cmd + " …");
+
+        const { error } = await sb.from("commands").insert([
+          { device_id: DEVICE_ID, cmd, args },
+        ]);
+
+        if (error) {
+          console.error(error);
+          setStatus("❌ Error: " + error.message);
+        } else {
+          setStatus(
+            "✔️ Sent: " + cmd + " at " + new Date().toLocaleTimeString()
+          );
+        }
+      }
+
+      if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.register("sw.js").catch(console.error);
+      }
+    </script>
+  </body>
+</html>
