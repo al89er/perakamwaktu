@@ -5,13 +5,8 @@
   --card-bg: #ffffff;
 
   --primary: #2d7df6;
-  --primary-soft: #e4edff;
-
   --warning: #fbbf24;
-  --warning-soft: #fff6d8;
-
   --danger: #ef4444;
-  --danger-soft: #ffe2e2;
 
   --text-main: #111827;
   --text-muted: #6b7280;
@@ -51,9 +46,10 @@ body {
   font-size: 15px;
 }
 
-/* --- Cards --- */
+/* Cards */
 
-.card, .status-card {
+.card,
+.status-card {
   background: var(--card-bg);
   margin: 16px;
   padding: 20px;
@@ -74,7 +70,7 @@ body {
   font-weight: 500;
 }
 
-/* --- Buttons --- */
+/* Buttons */
 
 .btn {
   width: 100%;
@@ -94,22 +90,19 @@ body {
 }
 
 .btn:hover {
-  opacity: 0.8;
+  opacity: 0.9;
 }
 
-/* Primary (Samsung Blue) */
 .btn.primary {
   background: var(--primary);
   color: #fff;
 }
 
-/* Warning (yellow-ish) */
 .btn.warning {
   background: var(--warning);
   color: #fff;
 }
 
-/* Danger (red) */
 .btn.danger {
   background: var(--danger);
   color: #fff;
