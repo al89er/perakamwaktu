@@ -59,6 +59,14 @@ body {
   color: white;
 }
 
+.tab-content {
+  display: none;
+}
+
+.tab-content.active {
+  display: block;
+}
+
 /* Cards */
 .card {
   background: white;
