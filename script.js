@@ -7,6 +7,11 @@ let calMonth = null; // 0–11
 let skipDaysSet = new Set(); // holds 'YYYY-MM-DD'
 let calSwipeDir = null; // 'left' or 'right' or null
 
+// Swipe state for tab switching
+let touchStartX = 0;
+let touchStartY = 0;
+let touchActive = false;
+
 /* ------------------------------
    INIT
 ------------------------------ */
@@ -240,30 +245,83 @@ function showToast(type, text) {
 }
 
 /* ------------------------------
-   TABS
+   TABS + SWIPE
 ------------------------------ */
+
 function initTabs() {
-  const tabs = document.querySelectorAll(".tab");
-  const contents = document.querySelectorAll(".tab-content");
+  const tabs = Array.from(document.querySelectorAll(".tab"));
+  const contents = Array.from(document.querySelectorAll(".tab-content"));
 
-  tabs.forEach((tab) => {
+  function activateTab(index) {
+    if (index < 0 || index >= tabs.length) return;
+    tabs.forEach((t) => t.classList.remove("active"));
+    contents.forEach((c) => c.classList.remove("active"));
+    tabs[index].classList.add("active");
+    const targetId = tabs[index].dataset.tab;
+    const target = document.getElementById(targetId);
+    if (target) target.classList.add("active");
+  }
+
+  // click handlers
+  tabs.forEach((tab, idx) => {
     tab.addEventListener("click", () => {
-      tabs.forEach((t) => t.classList.remove("active"));
-      tab.classList.add("active");
-
-      contents.forEach((c) => c.classList.remove("active"));
-      const target = document.getElementById(tab.dataset.tab);
-      if (target) target.classList.add("active");
+      activateTab(idx);
     });
   });
 
-  // safety: ensure at least one tab/content is active on load
-  if (!document.querySelector(".tab.active") && tabs[0]) {
-    tabs[0].classList.add("active");
-  }
-  if (!document.querySelector(".tab-content.active") && contents[0]) {
-    contents[0].classList.add("active");
-  }
+  // ensure one is active on load
+  const initialIndex =
+    tabs.findIndex((t) => t.classList.contains("active")) || 0;
+  activateTab(initialIndex);
+
+  // swipe handlers (on main content area)
+  const swipeTarget = document.body; // simple and works for full-screen PWA
+
+  swipeTarget.addEventListener(
+    "touchstart",
+    (e) => {
+      if (e.touches.length !== 1) return;
+      const touch = e.touches[0];
+      touchStartX = touch.clientX;
+      touchStartY = touch.clientY;
+      touchActive = true;
+    },
+    { passive: true }
+  );
+
+  swipeTarget.addEventListener(
+    "touchend",
+    (e) => {
+      if (!touchActive) return;
+      touchActive = false;
+      if (e.changedTouches.length !== 1) return;
+
+      const touch = e.changedTouches[0];
+      const dx = touch.clientX - touchStartX;
+      const dy = touch.clientY - touchStartY;
+
+      const absDx = Math.abs(dx);
+      const absDy = Math.abs(dy);
+
+      // must be mostly horizontal and large enough
+      const MIN_SWIPE = 60;
+      if (absDx < MIN_SWIPE || absDx < absDy) return;
+
+      const currentIndex = tabs.findIndex((t) =>
+        t.classList.contains("active")
+      );
+      if (currentIndex === -1) return;
+
+      if (dx < 0) {
+        // swipe left → next tab
+        activateTab(currentIndex + 1);
+      } else {
+        // swipe right → previous tab
+        activateTab(currentIndex - 1);
+      }
+    },
+    { passive: true }
+  );
 }
 
 /* ============================================================
