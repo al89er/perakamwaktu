@@ -172,3 +172,121 @@ body {
     transform: translateY(0);
   }
 }
+
+/* Calendar (Skips tab) */
+.subtext {
+  margin-top: 0;
+  margin-bottom: 10px;
+  font-size: 13px;
+  color: #666;
+}
+
+/* Calendar shell */
+#skipCalendar {
+  margin-top: 6px;
+}
+
+/* Header with month & nav arrows */
+.calendar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.calendar-title {
+  font-weight: 600;
+  font-size: 16px;
+}
+
+.calendar-nav {
+  border: none;
+  background: #f0f2f5;
+  border-radius: 999px;
+  width: 32px;
+  height: 32px;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.08s;
+}
+
+.calendar-nav:active {
+  transform: scale(0.95);
+}
+
+/* Calendar grid */
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+  font-size: 13px;
+}
+
+/* Weekday header cells */
+.calendar-weekday {
+  text-align: center;
+  font-weight: 600;
+  color: #666;
+  padding-bottom: 4px;
+}
+
+/* Empty placeholder cell */
+.calendar-empty {
+  height: 36px;
+}
+
+/* Day tiles */
+.calendar-day {
+  height: 36px;
+  border-radius: 999px;
+  background: #f3f4f7;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  transition: background 0.15s, transform 0.08s, box-shadow 0.15s;
+}
+
+.calendar-day span {
+  position: relative;
+  z-index: 2;
+}
+
+/* Ripple-like press */
+.calendar-day:active {
+  transform: scale(0.96);
+}
+
+/* Today highlight */
+.calendar-day.today {
+  border: 1px solid #007aff;
+}
+
+/* Skipped state */
+.calendar-day.skipped {
+  background: #007aff;
+  color: #fff;
+  box-shadow: 0 4px 10px rgba(0, 122, 255, 0.35);
+}
+
+/* Out-of-range / disabled look (if needed later) */
+.calendar-day.disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+/* Small pulse when month changes */
+.calendar-grid.fade-in {
+  animation: calFade 0.25s ease-out;
+}
+
+@keyframes calFade {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
