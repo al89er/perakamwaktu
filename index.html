@@ -31,13 +31,20 @@
   <section class="tab-content active" id="control">
     <div class="card">
       <h2>Clock Controls</h2>
-
+  
+      <!-- Last Command Result banner -->
+      <div class="last-result" id="lastResult">
+        <div class="last-result-label">Last command</div>
+        <div class="last-result-text" id="lastResultText">No commands yet</div>
+      </div>
+  
       <button class="action-btn" data-cmd="status">Status</button>
       <button class="action-btn" data-cmd="clockin">Clock In</button>
       <button class="action-btn" data-cmd="clockout">Clock Out</button>
       <button class="action-btn danger" data-cmd="refresh">Refresh Page</button>
     </div>
   </section>
+
 
   <!-- PROOF TAB -->
   <section class="tab-content" id="proof">
