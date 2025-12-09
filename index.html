@@ -1,476 +1,82 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <title>UPM Clock Remote</title>
-    <meta
-      name="viewport"
-      content="width=device-width,initial-scale=1,maximum-scale=1"
-    />
-    <link rel="manifest" href="manifest.json" />
-    <link rel="stylesheet" href="style.css" />
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Perakam Waktu Control</title>
+  <link rel="stylesheet" href="styles.css" />
+  <script defer src="config.js"></script>
+  <script defer src="script.js"></script>
+</head>
 
-    <!-- Supabase + config -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="config.js"></script>
-  </head>
+<body>
+  <!-- Top Bar -->
+  <header class="topbar">
+    <div class="topbar-title">Perakam Waktu Control</div>
+    <div class="status-indicator" id="statusDot"></div>
+  </header>
 
-  <body>
-    <header class="topbar">
-      <h1>UPM Clock Remote</h1>
-      <p class="subtitle">Control panel for your automated UPM clock-in/out</p>
-    </header>
+  <!-- Tab Bar -->
+  <div class="tabs">
+    <button class="tab active" data-tab="control">Control</button>
+    <button class="tab" data-tab="proof">Proof</button>
+    <button class="tab" data-tab="history">History</button>
+    <button class="tab" data-tab="skips">Skips</button>
+  </div>
 
-    <main>
-      <!-- STATUS CARD AT TOP -->
-      <div class="status-card">
-        <div id="status-main" class="status-main">Ready</div>
-        <div id="status-log" class="status-log"></div>
+  <!-- Tab Content -->
+
+  <!-- CONTROL TAB -->
+  <section class="tab-content active" id="control">
+    <div class="card">
+      <h2>Clock Controls</h2>
+
+      <button class="action-btn" data-cmd="status">Status</button>
+      <button class="action-btn" data-cmd="clockin">Clock In</button>
+      <button class="action-btn" data-cmd="clockout">Clock Out</button>
+      <button class="action-btn danger" data-cmd="refresh">Refresh Page</button>
+    </div>
+  </section>
+
+  <!-- PROOF TAB -->
+  <section class="tab-content" id="proof">
+    <div class="card">
+      <h2>Today's Proof</h2>
+
+      <div class="proof-row">
+        <span class="label">Masa Hadir</span>
+        <span class="value" id="proofHadir">—</span>
       </div>
 
-      <!-- TAB CONTENT: CONTROL -->
-      <section id="tab-control" class="tab-pane">
-        <section class="card">
-          <h2>Clock Controls</h2>
-
-          <!-- STATUS BUTTON FIRST -->
-          <button class="btn primary" onclick="sendCmd('status')">
-            Status
-          </button>
-
-          <button class="btn primary" onclick="sendCmd('clockin')">
-            Clock IN
-          </button>
-
-          <button class="btn primary" onclick="sendCmd('clockout')">
-            Clock OUT
-          </button>
-        </section>
-
-        <section class="card">
-          <h2>System</h2>
-
-          <button class="btn danger" onclick="sendCmd('refresh')">
-            Refresh Page
-          </button>
-          <button class="btn danger" onclick="sendCmd('hardreset')">
-            Hard Reset
-          </button>
-        </section>
-      </section>
-
-      <!-- TAB CONTENT: HISTORY -->
-      <section id="tab-history" class="tab-pane hidden">
-        <section class="card">
-          <h2>Response History (last 24h)</h2>
-          <div id="history-list" class="history-list"></div>
-        </section>
-      </section>
-
-      <!-- TAB CONTENT: SKIPS (calendar) -->
-      <section id="tab-skips" class="tab-pane hidden">
-        <section class="card">
-          <h2>Skip Planner</h2>
-
-          <div class="calendar-header">
-            <button class="calendar-nav" id="cal-prev">&lt;</button>
-            <div id="cal-label" class="calendar-label"></div>
-            <button class="calendar-nav" id="cal-next">&gt;</button>
-          </div>
-
-          <div class="calendar-weekdays">
-            <span>Mon</span>
-            <span>Tue</span>
-            <span>Wed</span>
-            <span>Thu</span>
-            <span>Fri</span>
-            <span>Sat</span>
-            <span>Sun</span>
-          </div>
-
-          <div id="calendar-grid" class="calendar-grid"></div>
-
-          <div class="calendar-legend">
-            <span class="legend-dot skipped"></span> Skipped
-            <span class="legend-dot today"></span> Today
-          </div>
-
-          <p class="calendar-hint">
-            Tap a date to toggle skip / unskip.  
-            (Stored in Supabase for <strong>desktop-resq</strong>.)
-          </p>
-        </section>
-      </section>
-    </main>
-
-    <!-- Bottom tab bar -->
-    <nav class="tab-bar">
-      <button class="tab-button active" data-tab="control">Control</button>
-      <button class="tab-button" data-tab="history">History</button>
-      <button class="tab-button" data-tab="skips">Skips</button>
-    </nav>
-
-    <!-- Toast popup -->
-    <div id="toast" class="toast"></div>
-
-    <script>
-      // Supabase client
-      const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-      const statusMainEl = document.getElementById("status-main");
-      const statusLogEl = document.getElementById("status-log");
-      const historyListEl = document.getElementById("history-list");
-      const toastEl = document.getElementById("toast");
-      let toastTimeout = null;
-
-      // === STATUS + TOAST ===
-      function setStatusMain(msg) {
-        statusMainEl.textContent = msg;
-      }
-
-      function appendStatusLog(msg) {
-        const row = document.createElement("div");
-        row.className = "status-log-item";
-        row.textContent =
-          new Date().toLocaleTimeString() + " — " + msg;
-        statusLogEl.prepend(row); // newest first
-      }
-
-      function showToast(msg) {
-        toastEl.textContent = msg;
-        toastEl.classList.add("show");
-        if (toastTimeout) clearTimeout(toastTimeout);
-        toastTimeout = setTimeout(() => {
-          toastEl.classList.remove("show");
-        }, 3000);
-      }
-
-      // === COMMAND SENDER ===
-      async function sendCmd(cmd, args = {}) {
-        setStatusMain("Sending: " + cmd + " …");
-
-        const { data, error } = await sb
-          .from("commands")
-          .insert([{ device_id: DEVICE_ID, cmd, args }])
-          .select()
-          .single(); // get inserted row
-
-        if (error) {
-          console.error(error);
-          setStatusMain("❌ Error: " + error.message);
-          appendStatusLog("Error sending " + cmd);
-          showToast("Error sending " + cmd);
-        } else {
-          setStatusMain(
-            "✔️ Sent: " + cmd + " at " + new Date().toLocaleTimeString()
-          );
-          appendStatusLog("Command sent: " + cmd);
-          showToast("Sent: " + cmd);
-        }
-      }
-
-      // === HISTORY (last 24h) ===
-      async function loadHistory() {
-        const sinceIso = new Date(
-          Date.now() - 24 * 60 * 60 * 1000
-        ).toISOString();
-
-        const { data, error } = await sb
-          .from("commands")
-          .select("id, cmd, response, created_at, ack_at")
-          .eq("device_id", DEVICE_ID)
-          .gte("created_at", sinceIso)
-          .order("created_at", { ascending: false })
-          .limit(50);
-
-        historyListEl.innerHTML = "";
-
-        if (error) {
-          console.error(error);
-          historyListEl.textContent = "Error loading history.";
-          return;
-        }
-
-        if (!data || data.length === 0) {
-          historyListEl.textContent = "No responses in the last 24 hours.";
-          return;
-        }
-
-        data.forEach((row) => {
-          const item = document.createElement("div");
-          item.className = "history-item";
-
-          const cmd = (row.cmd || "").toUpperCase();
-          const created = row.created_at
-            ? new Date(row.created_at).toLocaleTimeString()
-            : "";
-          const resp = row.response || "(no response yet)";
-
-          item.innerHTML = `
-            <div class="history-top">
-              <span class="history-cmd">${cmd}</span>
-              <span class="history-time">${created}</span>
-            </div>
-            <div class="history-response">${resp}</div>
-          `;
-
-          historyListEl.appendChild(item);
-        });
-      }
-
-      // === REALTIME RESPONSES (commands table) ===
-      function handleUpdateRow(row) {
-        if (!row) return;
-        const tag = row.cmd ? row.cmd.toUpperCase() : "CMD";
-
-        if (row.response) {
-          setStatusMain(row.response);
-          appendStatusLog("[" + tag + "] " + row.response);
-          showToast(row.response);
-
-          // auto-refresh history if visible
-          const historyVisible = !document
-            .getElementById("tab-history")
-            .classList.contains("hidden");
-          if (historyVisible) {
-            loadHistory();
-          }
-        } else if (row.ack_at) {
-          appendStatusLog("[" + tag + "] acknowledged");
-        }
-      }
-
-      const channel = sb
-        .channel("command_responses_" + DEVICE_ID)
-        .on(
-          "postgres_changes",
-          {
-            event: "UPDATE",
-            schema: "public",
-            table: "commands",
-            filter: `device_id=eq.${DEVICE_ID}`,
-          },
-          (payload) => {
-            handleUpdateRow(payload.new);
-          }
-        )
-        .subscribe();
-
-      // === RIPPLE EFFECT ===
-      function initRipples() {
-        document.querySelectorAll(".btn").forEach((btn) => {
-          btn.addEventListener("click", function (e) {
-            const rect = this.getBoundingClientRect();
-            const size = Math.max(rect.width, rect.height);
-            const ripple = document.createElement("span");
-            ripple.className = "ripple";
-            ripple.style.width = ripple.style.height = size + "px";
-            ripple.style.left =
-              e.clientX - rect.left - size / 2 + "px";
-            ripple.style.top =
-              e.clientY - rect.top - size / 2 + "px";
-
-            const existing = this.querySelector(".ripple");
-            if (existing) existing.remove();
-            this.appendChild(ripple);
-
-            setTimeout(() => ripple.remove(), 600);
-          });
-        });
-      }
-
-      // === TABS (Control / History / Skips) ===
-      function initTabs() {
-        const buttons = document.querySelectorAll(".tab-button");
-        const tabControl = document.getElementById("tab-control");
-        const tabHistory = document.getElementById("tab-history");
-        const tabSkips = document.getElementById("tab-skips");
-
-        buttons.forEach((btn) => {
-          btn.addEventListener("click", () => {
-            buttons.forEach((b) => b.classList.remove("active"));
-            btn.classList.add("active");
-
-            const tab = btn.dataset.tab;
-            tabControl.classList.add("hidden");
-            tabHistory.classList.add("hidden");
-            tabSkips.classList.add("hidden");
-
-            if (tab === "control") {
-              tabControl.classList.remove("hidden");
-            } else if (tab === "history") {
-              tabHistory.classList.remove("hidden");
-              loadHistory();
-            } else if (tab === "skips") {
-              tabSkips.classList.remove("hidden");
-              refreshCalendar();
-            }
-          });
-        });
-      }
-
-      // === SKIP CALENDAR ===
-      const calLabelEl = document.getElementById("cal-label");
-      const calGridEl = document.getElementById("calendar-grid");
-      const calPrevBtn = document.getElementById("cal-prev");
-      const calNextBtn = document.getElementById("cal-next");
-
-      let calCurrent = new Date(); // current visible month
-      let skipDates = new Set();   // 'YYYY-MM-DD' strings
-
-      function ymdKey(y, m, d) {
-        const mm = String(m + 1).padStart(2, "0");
-        const dd = String(d).padStart(2, "0");
-        return `${y}-${mm}-${dd}`;
-      }
-
-      async function loadSkipsForMonth(year, monthIndex) {
-        const monthStart = new Date(Date.UTC(year, monthIndex, 1));
-        const nextMonthStart = new Date(Date.UTC(year, monthIndex + 1, 1));
-
-        const from = monthStart.toISOString().slice(0, 10);
-        const to = nextMonthStart.toISOString().slice(0, 10); // exclusive
-
-        const { data, error } = await sb
-          .from("skip_days")
-          .select("day")
-          .eq("device_id", DEVICE_ID)
-          .gte("day", from)
-          .lt("day", to);
-
-        if (error) {
-          console.error(error);
-          showToast("Error loading skips");
-          return;
-        }
-
-        skipDates.clear();
-        (data || []).forEach((row) => {
-          if (row.day) skipDates.add(row.day);
-        });
-      }
-
-      function renderCalendar() {
-        const year = calCurrent.getFullYear();
-        const month = calCurrent.getMonth(); // 0–11
-
-        calLabelEl.textContent = calCurrent.toLocaleString(undefined, {
-          month: "long",
-          year: "numeric",
-        });
-
-        calGridEl.innerHTML = "";
-
-        const first = new Date(year, month, 1);
-        const firstWeekday = (first.getDay() + 6) % 7; // convert Sunday=0 to Sunday=6, Monday=0
-        const daysInMonth = new Date(year, month + 1, 0).getDate();
-        const today = new Date();
-        const todayKey = ymdKey(
-          today.getFullYear(),
-          today.getMonth(),
-          today.getDate()
-        );
-
-        // empty cells before first
-        for (let i = 0; i < firstWeekday; i++) {
-          const empty = document.createElement("div");
-          empty.className = "day-cell empty";
-          calGridEl.appendChild(empty);
-        }
-
-        for (let day = 1; day <= daysInMonth; day++) {
-          const key = ymdKey(year, month, day);
-          const cell = document.createElement("div");
-          cell.className = "day-cell";
-          cell.textContent = day;
-          cell.dataset.date = key;
-
-          if (key === todayKey) {
-            cell.classList.add("today");
-          }
-          if (skipDates.has(key)) {
-            cell.classList.add("skipped");
-          }
-
-          calGridEl.appendChild(cell);
-        }
-      }
-
-      async function refreshCalendar() {
-        const y = calCurrent.getFullYear();
-        const m = calCurrent.getMonth();
-        await loadSkipsForMonth(y, m);
-        renderCalendar();
-      }
-
-      async function toggleSkipDate(dateStr) {
-        const isSkipped = skipDates.has(dateStr);
-        const friendly = new Date(dateStr + "T00:00:00").toDateString();
-
-        if (isSkipped) {
-          const { error } = await sb
-            .from("skip_days")
-            .delete()
-            .eq("device_id", DEVICE_ID)
-            .eq("day", dateStr);
-          if (error) {
-            console.error(error);
-            showToast("Error unskipping");
-            return;
-          }
-          skipDates.delete(dateStr);
-          renderCalendar();
-          showToast("Unskipped " + friendly);
-        } else {
-          const { error } = await sb
-            .from("skip_days")
-            .upsert(
-              [{ device_id: DEVICE_ID, day: dateStr }],
-              { onConflict: "device_id,day" }
-            );
-          if (error) {
-            console.error(error);
-            showToast("Error skipping");
-            return;
-          }
-          skipDates.add(dateStr);
-          renderCalendar();
-          showToast("Skipped " + friendly);
-        }
-      }
-
-      function initCalendar() {
-        calPrevBtn.addEventListener("click", () => {
-          calCurrent.setMonth(calCurrent.getMonth() - 1);
-          refreshCalendar();
-        });
-
-        calNextBtn.addEventListener("click", () => {
-          calCurrent.setMonth(calCurrent.getMonth() + 1);
-          refreshCalendar();
-        });
-
-        calGridEl.addEventListener("click", (e) => {
-          const cell = e.target.closest(".day-cell");
-          if (!cell || !cell.dataset.date) return;
-          toggleSkipDate(cell.dataset.date);
-        });
-
-        // initial render for current month
-        refreshCalendar();
-      }
-
-      // Service worker + init
-      if ("serviceWorker" in navigator) {
-        navigator.serviceWorker.register("sw.js").catch(console.error);
-      }
-
-      window.addEventListener("load", () => {
-        initRipples();
-        initTabs();
-        loadHistory();    // pre-load history
-        initCalendar();   // init skip calendar
-      });
-    </script>
-  </body>
+      <div class="proof-row">
+        <span class="label">Masa Keluar</span>
+        <span class="value" id="proofKeluar">—</span>
+      </div>
+
+      <div class="proof-row">
+        <span class="label small">Last Updated</span>
+        <span class="value small" id="proofUpdated">—</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- HISTORY TAB -->
+  <section class="tab-content" id="history">
+    <div class="card">
+      <h2>Response History</h2>
+      <div id="historyList" class="history-list"></div>
+    </div>
+  </section>
+
+  <!-- SKIPS TAB -->
+  <section class="tab-content" id="skips">
+    <div class="card">
+      <h2>Skip Days</h2>
+      <div id="skipCalendar"></div>
+    </div>
+  </section>
+
+  <!-- Toast Container -->
+  <div id="toastContainer"></div>
+</body>
 </html>
