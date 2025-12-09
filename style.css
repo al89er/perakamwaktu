@@ -144,6 +144,61 @@ body {
   color: #666;
 }
 
+/* Proof cards styled like Perakam Waktu tiles */
+.proof-card-grid {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.proof-card {
+  flex: 1 1 220px;
+  border-radius: 18px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+}
+
+/* Yellow MASUK card */
+.proof-card.masuk {
+  background: #f4b400;          /* yellow-ish */
+  color: #0b2545;               /* dark blue text */
+}
+
+/* Green KELUAR card */
+.proof-card.keluar {
+  background: #4caf50;          /* green */
+  color: #ffffff;
+}
+
+.proof-time {
+  font-size: 28px;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.proof-title {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.proof-subtitle {
+  font-size: 12px;
+  margin-top: 2px;
+  opacity: 0.9;
+}
+
+/* Stack vertically on small screens */
+@media (max-width: 640px) {
+  .proof-card-grid {
+    flex-direction: column;
+  }
+}
+
+
 /* History */
 .history-list {
   max-height: 70vh;
