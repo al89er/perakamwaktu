@@ -1,12 +1,21 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
   <title>Perakam Waktu Control</title>
-  <link rel="stylesheet" href="styles.css" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#222222" />
+
+  <link rel="stylesheet" href="style.css" />
+  <link rel="manifest" href="manifest.json" />
+
+  <!-- Supabase JS -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <!-- Config (URL, keys, device id) -->
   <script defer src="config.js"></script>
+
+  <!-- Main UI logic -->
   <script defer src="script.js"></script>
 </head>
 
@@ -17,7 +26,7 @@
     <div class="status-indicator" id="statusDot"></div>
   </header>
 
-  <!-- Tab Bar -->
+  <!-- Tabs -->
   <div class="tabs">
     <button class="tab active" data-tab="control">Control</button>
     <button class="tab" data-tab="proof">Proof</button>
@@ -25,26 +34,23 @@
     <button class="tab" data-tab="skips">Skips</button>
   </div>
 
-  <!-- Tab Content -->
-
   <!-- CONTROL TAB -->
   <section class="tab-content active" id="control">
     <div class="card">
       <h2>Clock Controls</h2>
-  
-      <!-- Last Command Result banner -->
+
+      <!-- Last command result banner -->
       <div class="last-result" id="lastResult">
         <div class="last-result-label">Last command</div>
         <div class="last-result-text" id="lastResultText">No commands yet</div>
       </div>
-  
+
       <button class="action-btn" data-cmd="status">Status</button>
       <button class="action-btn" data-cmd="clockin">Clock In</button>
       <button class="action-btn" data-cmd="clockout">Clock Out</button>
       <button class="action-btn danger" data-cmd="refresh">Refresh Page</button>
     </div>
   </section>
-
 
   <!-- PROOF TAB -->
   <section class="tab-content" id="proof">
@@ -78,17 +84,23 @@
 
   <!-- SKIPS TAB -->
   <section class="tab-content" id="skips">
-  <div class="card">
-    <h2>Skip Days</h2>
-    <p class="subtext">
-      Tap a date to toggle skip. Skipped days are shown in blue.
-    </p>
-    <div id="skipCalendar"></div>
-  </div>
-</section>
+    <div class="card">
+      <h2>Skip Days</h2>
+      <p class="subtext">
+        Tap a date to toggle skip. Skipped days are shown in blue.
+      </p>
+      <div id="skipCalendar"></div>
+    </div>
+  </section>
 
-
-  <!-- Toast Container -->
+  <!-- Toasts -->
   <div id="toastContainer"></div>
+
+  <!-- Service worker registration -->
+  <script>
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("./sw.js").catch(console.error);
+    }
+  </script>
 </body>
 </html>
