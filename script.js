@@ -71,6 +71,7 @@ function handleSupabaseEvent(payload) {
   addHistoryEntry(r.response);
   showToast("info", r.response);
   updateProofFromText(r.response);
+   updateLastResult(r.response, r.updated_at || r.ack_at || r.created_at);
 }
 
 /* ------------------------------
@@ -144,6 +145,30 @@ function updateProofFromText(text) {
   if (elH) elH.textContent = h ? h[1] : "—";
   if (elK) elK.textContent = k ? k[1] : "—";
   if (elT) elT.textContent = t ? t[1] : "—";
+}
+
+/* ------------------------------
+   LAST COMMAND RESULT BANNER
+------------------------------ */
+function updateLastResult(text, timestamp) {
+  const box = document.getElementById("lastResult");
+  const msgEl = document.getElementById("lastResultText");
+  if (!box || !msgEl) return;
+
+  let suffix = "";
+  if (timestamp) {
+    try {
+      const dt = new Date(timestamp);
+      suffix = " · " + dt.toLocaleTimeString();
+    } catch {
+      // ignore parse errors, just show raw
+    }
+  }
+
+  msgEl.textContent = text + (suffix || "");
+  box.classList.remove("updated");
+  void box.offsetWidth; // force reflow
+  box.classList.add("updated");
 }
 
 /* ------------------------------
