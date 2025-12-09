@@ -5,6 +5,7 @@ let realtimeConnected = false;
 let calYear = null;
 let calMonth = null; // 0–11
 let skipDaysSet = new Set(); // holds 'YYYY-MM-DD'
+let calSwipeDir = null; // 'left' or 'right' or null
 
 /* ------------------------------
    INIT
@@ -27,7 +28,7 @@ async function initSupabase() {
   supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
   setStatus("yellow");
 
-  // Realtime: watch only commands for this device, on UPDATE (when response is written)
+  // Realtime: watch UPDATE on commands for this DEVICE_ID
   supabase
     .channel("commands_" + DEVICE_ID)
     .on(
@@ -64,14 +65,12 @@ function setStatus(color) {
 function handleSupabaseEvent(payload) {
   if (!payload.new) return;
   const r = payload.new;
-
-  // Safety: only handle rows with a response
   if (!r.response) return;
 
   addHistoryEntry(r.response);
   showToast("info", r.response);
   updateProofFromText(r.response);
-   updateLastResult(r.response, r.updated_at || r.ack_at || r.created_at);
+  updateLastResult(r.response, r.updated_at || r.ack_at || r.created_at);
 }
 
 /* ------------------------------
@@ -161,7 +160,7 @@ function updateLastResult(text, timestamp) {
       const dt = new Date(timestamp);
       suffix = " · " + dt.toLocaleTimeString();
     } catch {
-      // ignore parse errors, just show raw
+      // ignore parse errors
     }
   }
 
@@ -213,7 +212,7 @@ function initTabs() {
    Uses Supabase table "skip_days" with columns: device_id, day (date)
 =============================================================== */
 
-/* Init calendar skeleton & state */
+/* Init calendar shell & state */
 function initCalendar() {
   const container = document.getElementById("skipCalendar");
   if (!container) return;
@@ -233,10 +232,24 @@ function initCalendar() {
 
   document
     .getElementById("calPrevBtn")
-    .addEventListener("click", () => changeMonth(-1));
+    .addEventListener("click", () => {
+      calSwipeDir = "right"; // moving to previous month → swipe right
+      changeMonth(-1);
+    });
+
   document
     .getElementById("calNextBtn")
-    .addEventListener("click", () => changeMonth(1));
+    .addEventListener("click", () => {
+      calSwipeDir = "left"; // moving to next month → swipe left
+      changeMonth(1);
+    });
+
+  const grid = document.getElementById("calGrid");
+  if (grid) {
+    grid.addEventListener("animationend", () => {
+      grid.classList.remove("slide-left", "slide-right", "fade-in");
+    });
+  }
 
   renderCalendarGridSkeleton();
 }
@@ -254,13 +267,13 @@ async function changeMonth(delta) {
   await loadSkipDaysForCurrentMonth();
 }
 
-/* Short weekday headers + container */
+/* Weekday header + base structure */
 function renderCalendarGridSkeleton() {
   const grid = document.getElementById("calGrid");
   if (!grid) return;
 
   grid.innerHTML = "";
-  const weekdays = ["S", "M", "T", "W", "T", "F", "S"];
+  const weekdays = ["M", "T", "W", "T", "F", "S", "S"]; // Monday-first
   weekdays.forEach((d) => {
     const w = document.createElement("div");
     w.className = "calendar-weekday";
@@ -284,6 +297,7 @@ async function loadSkipDaysForCurrentMonth() {
 
   const start = new Date(calYear, calMonth, 1);
   const end = new Date(calYear, calMonth + 1, 0);
+
   const startStr = start.toISOString().slice(0, 10);
   const endStr = end.toISOString().slice(0, 10);
 
@@ -310,11 +324,15 @@ function renderCalendar() {
   const grid = document.getElementById("calGrid");
   if (!grid) return;
 
-  // reset grid (but keep weekday header row)
+  // Start clean with weekday header row
   grid.innerHTML = "";
   renderCalendarGridSkeleton();
 
-  const firstDay = new Date(calYear, calMonth, 1).getDay(); // 0=Sun
+  // Monday-first offset:
+  // JS getDay(): 0=Sun,1=Mon,...6=Sat → convert so 0=Mon,...6=Sun
+  const jsDay = new Date(calYear, calMonth, 1).getDay(); // 0–6
+  const firstDay = (jsDay + 6) % 7;
+
   const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
 
   const today = new Date();
@@ -322,7 +340,7 @@ function renderCalendar() {
   const todayM = today.getMonth();
   const todayD = today.getDate();
 
-  // Empty slots before 1st
+  // Empty slots before the 1st
   for (let i = 0; i < firstDay; i++) {
     const empty = document.createElement("div");
     empty.className = "calendar-empty";
@@ -337,10 +355,18 @@ function renderCalendar() {
     const dateObj = new Date(calYear, calMonth, d);
     const ymd = dateObj.toISOString().slice(0, 10);
 
+    // Today highlight
     if (calYear === todayY && calMonth === todayM && d === todayD) {
       cell.classList.add("today");
     }
 
+    // Weekend (JS: 0=Sun, 6=Sat)
+    const dayOfWeek = dateObj.getDay();
+    if (dayOfWeek === 0 || dayOfWeek === 6) {
+      cell.classList.add("weekend");
+    }
+
+    // Skipped state
     if (skipDaysSet.has(ymd)) {
       cell.classList.add("skipped");
     }
@@ -356,10 +382,21 @@ function renderCalendar() {
     grid.appendChild(cell);
   }
 
-  // small fade animation
-  grid.classList.remove("fade-in");
-  void grid.offsetWidth;
-  grid.classList.add("fade-in");
+  // Smooth month animation
+  grid.classList.remove("slide-left", "slide-right", "fade-in");
+  void grid.offsetWidth; // force reflow
+
+  if (calSwipeDir === "left") {
+    grid.classList.add("slide-left");
+  } else if (calSwipeDir === "right") {
+    grid.classList.add("slide-right");
+  } else {
+    // initial load / no explicit swipe → gentle fade
+    grid.classList.add("fade-in");
+  }
+
+  // Reset direction after applying
+  calSwipeDir = null;
 }
 
 /* Click handler: toggle skip for a date */
@@ -372,7 +409,7 @@ async function onDayClick(ymd, cell) {
   const isSkipped = skipDaysSet.has(ymd);
 
   if (isSkipped) {
-    // unskip
+    // Unskip
     const { error } = await supabase
       .from("skip_days")
       .delete()
@@ -389,7 +426,7 @@ async function onDayClick(ymd, cell) {
     cell.classList.remove("skipped");
     showToast("info", `Unskipped ${ymd}`);
   } else {
-    // skip
+    // Skip
     const { error } = await supabase.from("skip_days").upsert({
       device_id: DEVICE_ID,
       day: ymd,
