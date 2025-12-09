@@ -56,23 +56,30 @@
   <section class="tab-content" id="proof">
     <div class="card">
       <h2>Today's Proof</h2>
-
-      <div class="proof-row">
-        <span class="label">Masa Hadir</span>
-        <span class="value" id="proofHadir">—</span>
+  
+      <div class="proof-card-grid">
+        <!-- MASUK / HADIR -->
+        <div class="proof-card masuk">
+          <div class="proof-time" id="proofHadir">—</div>
+          <div class="proof-title">Masa Hadir</div>
+          <div class="proof-subtitle">Tarikh hadir pada hari ini</div>
+        </div>
+  
+        <!-- KELUAR -->
+        <div class="proof-card keluar">
+          <div class="proof-time" id="proofKeluar">—</div>
+          <div class="proof-title">Masa Keluar</div>
+          <div class="proof-subtitle">Masa keluar setelah tamat waktu pejabat</div>
+        </div>
       </div>
-
-      <div class="proof-row">
-        <span class="label">Masa Keluar</span>
-        <span class="value" id="proofKeluar">—</span>
-      </div>
-
+  
       <div class="proof-row">
         <span class="label small">Last Updated</span>
         <span class="value small" id="proofUpdated">—</span>
       </div>
     </div>
   </section>
+
 
   <!-- HISTORY TAB -->
   <section class="tab-content" id="history">
