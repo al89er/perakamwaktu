@@ -325,3 +325,27 @@ body {
     background-color: #f3f4f7;
   }
 }
+
+/* Weekend styling */
+.calendar-day.weekend {
+  opacity: 0.55;
+}
+
+/* Swipe animations */
+.calendar-grid.slide-left {
+  animation: calSlideLeft 0.25s ease-out;
+}
+
+.calendar-grid.slide-right {
+  animation: calSlideRight 0.25s ease-out;
+}
+
+@keyframes calSlideLeft {
+  from { opacity: 0; transform: translateX(20px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes calSlideRight {
+  from { opacity: 0; transform: translateX(-20px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
