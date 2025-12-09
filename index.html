@@ -29,31 +29,14 @@
   <!-- Tabs -->
   <div class="tabs">
     <button class="tab active" data-tab="control">Control</button>
-    <button class="tab" data-tab="proof">Proof</button>
+    <!--button class="tab" data-tab="proof">Proof</button-->
     <button class="tab" data-tab="history">History</button>
     <button class="tab" data-tab="skips">Skips</button>
   </div>
 
   <!-- CONTROL TAB -->
   <section class="tab-content active" id="control">
-    <div class="card">
-      <h2>Clock Controls</h2>
-
-      <!-- Last command result banner -->
-      <div class="last-result" id="lastResult">
-        <div class="last-result-label">Last command</div>
-        <div class="last-result-text" id="lastResultText">No commands yet</div>
-      </div>
-
-      <button class="action-btn" data-cmd="status">Status</button>
-      <button class="action-btn" data-cmd="clockin">Clock In</button>
-      <button class="action-btn" data-cmd="clockout">Clock Out</button>
-      <button class="action-btn danger" data-cmd="refresh">Refresh Page</button>
-    </div>
-  </section>
-
-  <!-- PROOF TAB -->
-  <section class="tab-content" id="proof">
+    <!-- PROOF CARDS AT TOP -->
     <div class="card">
       <h2>Today's Proof</h2>
   
@@ -78,8 +61,34 @@
         <span class="value small" id="proofUpdated">—</span>
       </div>
     </div>
+  
+    <!-- CLOCK CONTROL BELOW -->
+    <div class="card">
+      <h2>Clock Control</h2>
+  
+      <div id="lastResult" class="last-result">
+        <span id="lastResultText">No commands yet.</span>
+      </div>
+  
+      <div class="button-grid">
+        <button class="action-btn primary" data-cmd="status">
+          Status
+        </button>
+        <button class="action-btn" data-cmd="clockin">
+          Clock In
+        </button>
+        <button class="action-btn" data-cmd="clockout">
+          Clock Out
+        </button>
+        <button class="action-btn" data-cmd="refresh">
+          Soft Refresh
+        </button>
+        <button class="action-btn danger" data-cmd="hardreset">
+          Hard Reset
+        </button>
+      </div>
+    </div>
   </section>
-
 
   <!-- HISTORY TAB -->
   <section class="tab-content" id="history">
