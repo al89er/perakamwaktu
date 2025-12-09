@@ -28,16 +28,15 @@ async function initSupabase() {
   supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
   setStatus("yellow");
 
-  // Realtime: watch UPDATE on commands for this DEVICE_ID
+  // Realtime: watch UPDATE on commands, filter by device_id in JS
   supabase
-    .channel("commands_" + DEVICE_ID)
+    .channel("commands_realtime")
     .on(
       "postgres_changes",
       {
         event: "UPDATE",
         schema: "public",
         table: "commands",
-        filter: `device_id=eq.${DEVICE_ID}`,
       },
       handleSupabaseEvent
     )
@@ -68,12 +67,15 @@ function setStatus(color) {
 function handleSupabaseEvent(payload) {
   if (!payload.new) return;
   const r = payload.new;
+
+  // Ignore other devices
+  if (r.device_id && r.device_id !== DEVICE_ID) return;
   if (!r.response) return;
 
   addHistoryEntry(r.response);
   showToast("info", r.response);
   updateProofFromText(r.response);
-  updateLastResult(r.response, r.updated_at || r.ack_at || r.created_at);
+  updateLastResult(r.response, r.updated_at || r.created_at);
 }
 
 /* ------------------------------
@@ -141,13 +143,14 @@ async function loadInitialHistoryAndProof() {
 
   const { data, error } = await supabase
     .from("commands")
-    .select("cmd,response,created_at,ack_at,updated_at")
+    .select("cmd,response,device_id,created_at")
     .eq("device_id", DEVICE_ID)
     .gte("created_at", sinceISO)
     .order("created_at", { ascending: false });
 
   if (error) {
     console.error(error);
+    showToast("error", "Failed to load history");
     return;
   }
   if (!data || !data.length) return;
@@ -160,10 +163,7 @@ async function loadInitialHistoryAndProof() {
   // Last result banner: newest row with response
   const latest = data.find((row) => row.response);
   if (latest) {
-    updateLastResult(
-      latest.response,
-      latest.updated_at || latest.ack_at || latest.created_at
-    );
+    updateLastResult(latest.response, latest.created_at);
   }
 
   // Proof: newest row for TODAY that has "Proof"
