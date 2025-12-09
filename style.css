@@ -149,11 +149,11 @@ body {
   display: flex;
   gap: 16px;
   margin-bottom: 12px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;        /* 🔒 keep them on one row */
 }
 
 .proof-card {
-  flex: 1 1 220px;
+  flex: 1 1 50%;
   border-radius: 18px;
   padding: 14px 16px;
   display: flex;
@@ -164,13 +164,13 @@ body {
 
 /* Yellow MASUK card */
 .proof-card.masuk {
-  background: #f4b400;          /* yellow-ish */
-  color: #0b2545;               /* dark blue text */
+  background: #f4b400;
+  color: #0b2545;
 }
 
 /* Green KELUAR card */
 .proof-card.keluar {
-  background: #4caf50;          /* green */
+  background: #4caf50;
   color: #ffffff;
 }
 
@@ -190,14 +190,6 @@ body {
   margin-top: 2px;
   opacity: 0.9;
 }
-
-/* Stack vertically on small screens */
-@media (max-width: 640px) {
-  .proof-card-grid {
-    flex-direction: column;
-  }
-}
-
 
 /* History */
 .history-list {
