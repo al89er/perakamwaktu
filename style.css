@@ -290,3 +290,38 @@ body {
   from { opacity: 0; transform: translateY(4px); }
   to   { opacity: 1; transform: translateY(0); }
 }
+
+/* Last command result banner */
+.last-result {
+  background: #f3f4f7;
+  border-radius: 14px;
+  padding: 10px 12px;
+  margin-bottom: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.last-result-label {
+  font-size: 12px;
+  color: #666;
+}
+
+.last-result-text {
+  font-size: 13px;
+  color: #111;
+}
+
+/* Subtle pulse when updated */
+.last-result.updated {
+  animation: lastResultPulse 0.35s ease-out;
+}
+
+@keyframes lastResultPulse {
+  0% {
+    background-color: #e3f2ff;
+  }
+  100% {
+    background-color: #f3f4f7;
+  }
+}
