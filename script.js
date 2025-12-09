@@ -46,6 +46,9 @@ async function initSupabase() {
       setStatus(realtimeConnected ? "green" : "yellow");
     });
 
+  // Load last 24h history + proof on startup
+  await loadInitialHistoryAndProof();
+
   // Init calendar once Supabase client exists
   initCalendar();
   await loadSkipDaysForCurrentMonth();
@@ -125,6 +128,53 @@ function addHistoryEntry(text) {
   div.className = "history-item";
   div.textContent = text;
   container.prepend(div);
+}
+
+/* Load last 24h history + proof for today */
+async function loadInitialHistoryAndProof() {
+  if (!supabase) return;
+
+  const now = new Date();
+  const since = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+  const sinceISO = since.toISOString();
+  const todayYMD = formatYMD(now.getFullYear(), now.getMonth(), now.getDate());
+
+  const { data, error } = await supabase
+    .from("commands")
+    .select("cmd,response,created_at,ack_at,updated_at")
+    .eq("device_id", DEVICE_ID)
+    .gte("created_at", sinceISO)
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    console.error(error);
+    return;
+  }
+  if (!data || !data.length) return;
+
+  // History: newest → oldest
+  data.forEach((row) => {
+    if (row.response) addHistoryEntry(row.response);
+  });
+
+  // Last result banner: newest row with response
+  const latest = data.find((row) => row.response);
+  if (latest) {
+    updateLastResult(
+      latest.response,
+      latest.updated_at || latest.ack_at || latest.created_at
+    );
+  }
+
+  // Proof: newest row for TODAY that has "Proof"
+  for (const row of data) {
+    if (!row.response || !row.response.includes("Proof")) continue;
+    const rowYMD = ymdFromTimestamp(row.created_at);
+    if (rowYMD === todayYMD) {
+      updateProofFromText(row.response);
+      break;
+    }
+  }
 }
 
 /* ------------------------------
@@ -226,6 +276,12 @@ function formatYMD(year, month0, day) {
   const m = String(month0 + 1).padStart(2, "0");
   const d = String(day).padStart(2, "0");
   return `${year}-${m}-${d}`;
+}
+
+/* Helper: YMD from ISO timestamp, in local time */
+function ymdFromTimestamp(ts) {
+  const d = new Date(ts);
+  return formatYMD(d.getFullYear(), d.getMonth(), d.getDate());
 }
 
 /* Init calendar shell & state */
