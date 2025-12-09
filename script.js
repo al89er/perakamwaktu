@@ -202,15 +202,31 @@ function initTabs() {
       tab.classList.add("active");
 
       contents.forEach((c) => c.classList.remove("active"));
-      document.getElementById(tab.dataset.tab).classList.add("active");
+      const target = document.getElementById(tab.dataset.tab);
+      if (target) target.classList.add("active");
     });
   });
+
+  // safety: ensure at least one tab/content is active on load
+  if (!document.querySelector(".tab.active") && tabs[0]) {
+    tabs[0].classList.add("active");
+  }
+  if (!document.querySelector(".tab-content.active") && contents[0]) {
+    contents[0].classList.add("active");
+  }
 }
 
 /* ============================================================
    SKIP CALENDAR (One UI 8 style)
    Uses Supabase table "skip_days" with columns: device_id, day (date)
 =============================================================== */
+
+/* Helper: format YYYY-MM-DD in local time */
+function formatYMD(year, month0, day) {
+  const m = String(month0 + 1).padStart(2, "0");
+  const d = String(day).padStart(2, "0");
+  return `${year}-${m}-${d}`;
+}
 
 /* Init calendar shell & state */
 function initCalendar() {
@@ -295,11 +311,9 @@ async function loadSkipDaysForCurrentMonth() {
     });
   }
 
-  const start = new Date(calYear, calMonth, 1);
-  const end = new Date(calYear, calMonth + 1, 0);
-
-  const startStr = start.toISOString().slice(0, 10);
-  const endStr = end.toISOString().slice(0, 10);
+  const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
+  const startStr = formatYMD(calYear, calMonth, 1);
+  const endStr = formatYMD(calYear, calMonth, daysInMonth);
 
   const { data, error } = await supabase
     .from("skip_days")
@@ -352,8 +366,7 @@ function renderCalendar() {
     const cell = document.createElement("div");
     cell.className = "calendar-day";
 
-    const dateObj = new Date(calYear, calMonth, d);
-    const ymd = dateObj.toISOString().slice(0, 10);
+    const ymd = formatYMD(calYear, calMonth, d);
 
     // Today highlight
     if (calYear === todayY && calMonth === todayM && d === todayD) {
@@ -361,6 +374,7 @@ function renderCalendar() {
     }
 
     // Weekend (JS: 0=Sun, 6=Sat)
+    const dateObj = new Date(calYear, calMonth, d);
     const dayOfWeek = dateObj.getDay();
     if (dayOfWeek === 0 || dayOfWeek === 6) {
       cell.classList.add("weekend");
