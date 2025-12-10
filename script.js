@@ -186,19 +186,41 @@ async function loadInitialHistoryAndProof() {
    PROOF PANEL UPDATE
 ------------------------------ */
 function updateProofFromText(text) {
-  if (!text.includes("Proof")) return;
-
-  const h = text.match(/Hadir=([^ ]+)/);
-  const k = text.match(/Keluar=([^ ]+)/);
-  const t = text.match(/captured ([0-9:AMP]+)/i);
-
   const elH = document.getElementById("proofHadir");
   const elK = document.getElementById("proofKeluar");
   const elT = document.getElementById("proofUpdated");
+  const cardMasuk = document.querySelector(".proof-card.masuk");
+  const cardKeluar = document.querySelector(".proof-card.keluar");
 
-  if (elH) elH.textContent = h ? h[1] : "—";
-  if (elK) elK.textContent = k ? k[1] : "—";
-  if (elT) elT.textContent = t ? t[1] : "—";
+  if (!elH || !elK || !elT) return;
+
+  const isSkipped = text.includes("(SKIPPED)");
+
+  if (isSkipped) {
+    // 🔘 Grey "Skipped" state
+    elH.textContent = "Skipped";
+    elK.textContent = "Skipped";
+    elT.textContent = "—";
+
+    if (cardMasuk) cardMasuk.classList.add("skipped");
+    if (cardKeluar) cardKeluar.classList.add("skipped");
+    return;
+  }
+
+  // Not skipped → normal proof. Remove any previous skipped styling
+  if (cardMasuk) cardMasuk.classList.remove("skipped");
+  if (cardKeluar) cardKeluar.classList.remove("skipped");
+
+  // For non-skipped days, only update if the response has Proof block
+  if (!text.includes("Proof")) return;
+
+  const h = text.match(/Hadir=([^ ]+)/);
+  const k = text.match(/Keluar=([^ )]+)/);
+  const t = text.match(/captured ([0-9:AMP]+)/i);
+
+  elH.textContent = h ? h[1] : "—";
+  elK.textContent = k ? k[1] : "—";
+  elT.textContent = t ? t[1] : "—";
 }
 
 /* ------------------------------
