@@ -162,6 +162,21 @@ body {
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
 }
 
+/* Skipped-day visual state */
+.proof-card.skipped {
+  background: #9e9e9e !important;
+  color: #ffffff !important;
+}
+
+.proof-card.skipped .proof-subtitle {
+  opacity: 0.9;
+}
+
+/* Optional: make the "Skipped" label stand out a bit more */
+.proof-card.skipped .proof-time {
+  font-weight: 700;
+}
+
 /* Yellow MASUK card */
 .proof-card.masuk {
   background: #f4b400;
