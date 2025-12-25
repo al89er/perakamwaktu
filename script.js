@@ -292,10 +292,9 @@ function initTabs() {
   });
 
   // ensure one is active on load
-  const initialIndex =
-    tabs.findIndex((t) => t.classList.contains("active")) || 0;
-  activateTab(initialIndex);
-
+  let initialIndex = tabs.findIndex((t) => t.classList.contains("active"));
+if (initialIndex < 0) initialIndex = 0;
+activateTab(initialIndex);
   // swipe handlers (on main content area)
   const swipeTarget = document.body; // simple and works for full-screen PWA
 
