@@ -1,3 +1,5 @@
+window.alert("Script Started");
+
 let supabase = null;
 let realtimeConnected = false;
 
