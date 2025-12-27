@@ -271,79 +271,89 @@ function showToast(type, text) {
 ------------------------------ */
 
 function initTabs() {
-  const tabs = Array.from(document.querySelectorAll(".tab"));
-  const contents = Array.from(document.querySelectorAll(".tab-content"));
+  // 1. Helper to get fresh elements (Solves Stale DOM issue)
+  const getTabs = () => Array.from(document.querySelectorAll(".tab"));
+  const getContents = () => Array.from(document.querySelectorAll(".tab-content"));
 
-  function activateTab(index) {
-    if (index < 0 || index >= tabs.length) return;
-    tabs.forEach((t) => t.classList.remove("active"));
-    contents.forEach((c) => c.classList.remove("active"));
-    tabs[index].classList.add("active");
-    const targetId = tabs[index].dataset.tab;
-    const target = document.getElementById(targetId);
-    if (target) target.classList.add("active");
+  function activateTab(targetIndex) {
+    const tabs = getTabs();
+    const contents = getContents();
+    
+    // 2. Elegant Clamping (Prevents Out-of-Bounds errors)
+    // Ensures index is never < 0 and never > last index
+    const safeIndex = Math.max(0, Math.min(targetIndex, tabs.length - 1));
+
+    // Update Tab UI
+    tabs.forEach((t, i) => {
+      const isActive = i === safeIndex;
+      t.classList.toggle("active", isActive);
+      
+      // Update Content UI (Sync by index or ID)
+      const targetId = t.dataset.tab;
+      const contentEl = document.getElementById(targetId);
+      if (contentEl) {
+        contentEl.classList.toggle("active", isActive);
+      }
+    });
   }
 
-  // click handlers
-  tabs.forEach((tab, idx) => {
-    tab.addEventListener("click", () => {
-      activateTab(idx);
+  // 3. Event Delegation (Cleaner than looping listeners)
+  // We attach ONE listener to the container instead of N listeners
+  const tabContainer = document.querySelector(".tabs");
+  if (tabContainer) {
+    tabContainer.addEventListener("click", (e) => {
+      const clickedTab = e.target.closest(".tab");
+      if (!clickedTab) return;
+      
+      const tabs = getTabs();
+      const index = tabs.indexOf(clickedTab);
+      if (index !== -1) activateTab(index);
     });
-  });
+  }
 
-  // ensure one is active on load
-  let initialIndex = tabs.findIndex((t) => t.classList.contains("active"));
-if (initialIndex < 0) initialIndex = 0;
-activateTab(initialIndex);
-  // swipe handlers (on main content area)
-  const swipeTarget = document.body; // simple and works for full-screen PWA
+  // 4. Initialization
+  // Ensure we start with a valid state
+  const tabs = getTabs();
+  const activeIndex = tabs.findIndex((t) => t.classList.contains("active"));
+  activateTab(activeIndex === -1 ? 0 : activeIndex);
 
-  swipeTarget.addEventListener(
-    "touchstart",
-    (e) => {
-      if (e.touches.length !== 1) return;
-      const touch = e.touches[0];
-      touchStartX = touch.clientX;
-      touchStartY = touch.clientY;
-      touchActive = true;
-    },
-    { passive: true }
-  );
+  // 5. Swipe Logic (Unchanged but uses the dynamic activateTab)
+  const swipeTarget = document.body;
+  let touchStartX = 0;
+  let touchStartY = 0;
+  let touchActive = false;
 
-  swipeTarget.addEventListener(
-    "touchend",
-    (e) => {
-      if (!touchActive) return;
-      touchActive = false;
-      if (e.changedTouches.length !== 1) return;
+  swipeTarget.addEventListener("touchstart", (e) => {
+    if (e.touches.length !== 1) return;
+    touchStartX = e.touches[0].clientX;
+    touchStartY = e.touches[0].clientY;
+    touchActive = true;
+  }, { passive: true });
 
-      const touch = e.changedTouches[0];
-      const dx = touch.clientX - touchStartX;
-      const dy = touch.clientY - touchStartY;
+  swipeTarget.addEventListener("touchend", (e) => {
+    if (!touchActive) return;
+    touchActive = false;
+    if (e.changedTouches.length !== 1) return;
 
-      const absDx = Math.abs(dx);
-      const absDy = Math.abs(dy);
+    const dx = e.changedTouches[0].clientX - touchStartX;
+    const dy = e.changedTouches[0].clientY - touchStartY;
+    
+    // Ignore small swipes or vertical scrolls
+    if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy)) return;
 
-      // must be mostly horizontal and large enough
-      const MIN_SWIPE = 60;
-      if (absDx < MIN_SWIPE || absDx < absDy) return;
-
-      const currentIndex = tabs.findIndex((t) =>
-        t.classList.contains("active")
-      );
-      if (currentIndex === -1) return;
-
-      if (dx < 0) {
-        // swipe left → next tab
-        activateTab(currentIndex + 1);
-      } else {
-        // swipe right → previous tab
-        activateTab(currentIndex - 1);
-      }
-    },
-    { passive: true }
-  );
+    const currentTabs = getTabs();
+    const currentIndex = currentTabs.findIndex(t => t.classList.contains("active"));
+    
+    if (dx < 0) {
+      // Swipe Left -> Next Tab
+      activateTab(currentIndex + 1);
+    } else {
+      // Swipe Right -> Prev Tab
+      activateTab(currentIndex - 1);
+    }
+  }, { passive: true });
 }
+
 
 /* ============================================================
    SKIP CALENDAR (One UI 8 style)
