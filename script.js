@@ -12,12 +12,14 @@ let calSwipeDir = null; // 'left' or 'right' or null
 // Swipe state for tab switching
 let touchStartX = 0;
 let touchStartY = 0;
-let touchActive = false;
 
 /* ------------------------------
    INIT
 ------------------------------ */
 document.addEventListener("DOMContentLoaded", () => {
+  // Debug Alert - You can remove this after it works
+  window.alert("Script Loaded Successfully!");
+  
   initTabs();
   initButtons();
   initSupabase();
@@ -269,38 +271,30 @@ function showToast(type, text) {
 }
 
 /* ------------------------------
-   TABS + SWIPE
+   TABS + SWIPE (FIXED & SAFE)
 ------------------------------ */
-
 function initTabs() {
-  // 1. Helper to get fresh elements (Solves Stale DOM issue)
   const getTabs = () => Array.from(document.querySelectorAll(".tab"));
   const getContents = () => Array.from(document.querySelectorAll(".tab-content"));
 
   function activateTab(targetIndex) {
     const tabs = getTabs();
-    const contents = getContents();
-    
-    // 2. Elegant Clamping (Prevents Out-of-Bounds errors)
-    // Ensures index is never < 0 and never > last index
+    if (tabs.length === 0) return;
+
+    // Elegant clamping
     const safeIndex = Math.max(0, Math.min(targetIndex, tabs.length - 1));
 
-    // Update Tab UI
     tabs.forEach((t, i) => {
       const isActive = i === safeIndex;
       t.classList.toggle("active", isActive);
       
-      // Update Content UI (Sync by index or ID)
       const targetId = t.dataset.tab;
       const contentEl = document.getElementById(targetId);
-      if (contentEl) {
-        contentEl.classList.toggle("active", isActive);
-      }
+      if (contentEl) contentEl.classList.toggle("active", isActive);
     });
   }
 
-  // 3. Event Delegation (Cleaner than looping listeners)
-  // We attach ONE listener to the container instead of N listeners
+  // Event Delegation
   const tabContainer = document.querySelector(".tabs");
   if (tabContainer) {
     tabContainer.addEventListener("click", (e) => {
@@ -313,13 +307,14 @@ function initTabs() {
     });
   }
 
-  // 4. Initialization
-  // Ensure we start with a valid state
+  // Init
   const tabs = getTabs();
-  const activeIndex = tabs.findIndex((t) => t.classList.contains("active"));
-  activateTab(activeIndex === -1 ? 0 : activeIndex);
+  if (tabs.length > 0) {
+    const activeIndex = tabs.findIndex((t) => t.classList.contains("active"));
+    activateTab(activeIndex === -1 ? 0 : activeIndex);
+  }
 
-  // 5. Swipe Logic (Unchanged but uses the dynamic activateTab)
+  // Swipe
   const swipeTarget = document.body;
   let touchStartX = 0;
   let touchStartY = 0;
@@ -340,26 +335,21 @@ function initTabs() {
     const dx = e.changedTouches[0].clientX - touchStartX;
     const dy = e.changedTouches[0].clientY - touchStartY;
     
-    // Ignore small swipes or vertical scrolls
     if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy)) return;
 
     const currentTabs = getTabs();
     const currentIndex = currentTabs.findIndex(t => t.classList.contains("active"));
     
     if (dx < 0) {
-      // Swipe Left -> Next Tab
       activateTab(currentIndex + 1);
     } else {
-      // Swipe Right -> Prev Tab
       activateTab(currentIndex - 1);
     }
   }, { passive: true });
 }
 
-
 /* ============================================================
    SKIP CALENDAR (One UI 8 style)
-   Uses Supabase table "skip_days" with columns: device_id, day (date)
 =============================================================== */
 
 /* Helper: format YYYY-MM-DD in local time */
@@ -396,14 +386,14 @@ function initCalendar() {
   document
     .getElementById("calPrevBtn")
     .addEventListener("click", () => {
-      calSwipeDir = "right"; // moving to previous month → swipe right
+      calSwipeDir = "right"; 
       changeMonth(-1);
     });
 
   document
     .getElementById("calNextBtn")
     .addEventListener("click", () => {
-      calSwipeDir = "left"; // moving to next month → swipe left
+      calSwipeDir = "left"; 
       changeMonth(1);
     });
 
@@ -485,12 +475,9 @@ function renderCalendar() {
   const grid = document.getElementById("calGrid");
   if (!grid) return;
 
-  // Start clean with weekday header row
   grid.innerHTML = "";
   renderCalendarGridSkeleton();
 
-  // Monday-first offset:
-  // JS getDay(): 0=Sun,1=Mon,...6=Sat → convert so 0=Mon,...6=Sun
   const jsDay = new Date(calYear, calMonth, 1).getDay(); // 0–6
   const firstDay = (jsDay + 6) % 7;
 
@@ -501,33 +488,28 @@ function renderCalendar() {
   const todayM = today.getMonth();
   const todayD = today.getDate();
 
-  // Empty slots before the 1st
   for (let i = 0; i < firstDay; i++) {
     const empty = document.createElement("div");
     empty.className = "calendar-empty";
     grid.appendChild(empty);
   }
 
-  // Actual days
   for (let d = 1; d <= daysInMonth; d++) {
     const cell = document.createElement("div");
     cell.className = "calendar-day";
 
     const ymd = formatYMD(calYear, calMonth, d);
 
-    // Today highlight
     if (calYear === todayY && calMonth === todayM && d === todayD) {
       cell.classList.add("today");
     }
 
-    // Weekend (JS: 0=Sun, 6=Sat)
     const dateObj = new Date(calYear, calMonth, d);
     const dayOfWeek = dateObj.getDay();
     if (dayOfWeek === 0 || dayOfWeek === 6) {
       cell.classList.add("weekend");
     }
 
-    // Skipped state
     if (skipDaysSet.has(ymd)) {
       cell.classList.add("skipped");
     }
@@ -543,20 +525,16 @@ function renderCalendar() {
     grid.appendChild(cell);
   }
 
-  // Smooth month animation
   grid.classList.remove("slide-left", "slide-right", "fade-in");
-  void grid.offsetWidth; // force reflow
+  void grid.offsetWidth; 
 
   if (calSwipeDir === "left") {
     grid.classList.add("slide-left");
   } else if (calSwipeDir === "right") {
     grid.classList.add("slide-right");
   } else {
-    // initial load / no explicit swipe → gentle fade
     grid.classList.add("fade-in");
   }
-
-  // Reset direction after applying
   calSwipeDir = null;
 }
 
