@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
   <title>Perakam Waktu Control</title>
@@ -8,6 +9,9 @@
 
   <link rel="stylesheet" href="style.css" />
   <link rel="manifest" href="manifest.json" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
   <!-- Supabase JS -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -22,9 +26,14 @@
 <body>
   <!-- Top Bar -->
   <header class="topbar">
-    <div class="topbar-title">Perakam Waktu Control</div>
+    <div class="topbar-title">Perakam Waktu</div>
     <div class="status-indicator" id="statusDot"></div>
   </header>
+
+  <!-- Pull to Refresh Indicator -->
+  <div id="pullToRefresh" class="ptr-element">
+    <div class="ptr-icon">🔄</div>
+  </div>
 
   <!-- Tabs -->
   <div class="tabs">
@@ -34,80 +43,81 @@
     <button class="tab" data-tab="skips">Skips</button>
   </div>
 
-  <!-- CONTROL TAB -->
-  <section class="tab-content active" id="control">
-    <!-- PROOF CARDS AT TOP -->
-    <div class="card">
-      <h2>Today's Proof</h2>
-  
-      <div class="proof-card-grid">
-        <!-- MASUK / HADIR -->
-        <div class="proof-card masuk">
-          <div class="proof-time" id="proofHadir">—</div>
-          <div class="proof-title">Masa Hadir</div>
-          <div class="proof-subtitle">Tarikh hadir pada hari ini</div>
-        </div>
-  
-        <!-- KELUAR -->
-        <div class="proof-card keluar">
-          <div class="proof-time" id="proofKeluar">—</div>
-          <div class="proof-title">Masa Keluar</div>
-          <div class="proof-subtitle">Masa keluar setelah tamat waktu pejabat</div>
-        </div>
-      </div>
-  
-      <div class="proof-row">
-        <span class="label small">Last Updated</span>
-        <span class="value small" id="proofUpdated">—</span>
-      </div>
-    </div>
-  
-    <!-- CLOCK CONTROL BELOW -->
-    <div class="card">
-      <h2>Clock Control</h2>
-  
-      <div id="lastResult" class="last-result">
-        <span id="lastResultText">No commands yet.</span>
-      </div>
-  
-      <div class="button-grid">
-        <button class="action-btn primary" data-cmd="status">
-          Status
-        </button>
-        <button class="action-btn" data-cmd="clockin">
-          Clock In
-        </button>
-        <button class="action-btn" data-cmd="clockout">
-          Clock Out
-        </button>
-        <button class="action-btn" data-cmd="refresh">
-          Soft Refresh
-        </button>
-        <button class="action-btn danger" data-cmd="hardreset">
-          Hard Reset
-        </button>
-      </div>
-    </div>
-  </section>
+  <!-- Tabs Viewport for Swiping -->
+  <div class="tabs-viewport" id="tabsViewport">
+    <!-- CONTROL TAB -->
+    <section class="tab-content" id="control">
+      <!-- PROOF CARDS AT TOP -->
+      <div class="card">
+        <h2>Today's Proof</h2>
 
-  <!-- HISTORY TAB -->
-  <section class="tab-content" id="history">
-    <div class="card">
-      <h2>Response History</h2>
-      <div id="historyList" class="history-list"></div>
-    </div>
-  </section>
+        <div class="proof-card-grid">
+          <!-- MASUK / HADIR -->
+          <div class="proof-card masuk">
+            <div class="proof-time" id="proofHadir">—</div>
+            <div class="proof-title">Masa Hadir</div>
+            <div class="proof-subtitle">Tarikh hadir pada hari ini</div>
+          </div>
 
-  <!-- SKIPS TAB -->
-  <section class="tab-content" id="skips">
-    <div class="card">
-      <h2>Skip Days</h2>
-      <p class="subtext">
-        Tap a date to toggle skip. Skipped days are shown in blue.
-      </p>
-      <div id="skipCalendar"></div>
-    </div>
-  </section>
+          <!-- KELUAR -->
+          <div class="proof-card keluar">
+            <div class="proof-time" id="proofKeluar">—</div>
+            <div class="proof-title">Masa Keluar</div>
+            <div class="proof-subtitle">Masa keluar setelah tamat waktu pejabat</div>
+          </div>
+        </div>
+
+        <div class="proof-row">
+          <span class="label small">Last Updated</span>
+          <span class="value small" id="proofUpdated">—</span>
+        </div>
+      </div>
+
+      <!-- CLOCK CONTROL BELOW -->
+      <div class="card control-center">
+        <div class="primary-action">
+          <button class="action-btn status-btn" data-cmd="status">
+            <span class="btn-icon">🔍</span>
+            <span class="btn-text">Check System Status</span>
+          </button>
+        </div>
+
+        <div id="lastResult" class="last-result-v2">
+          <div class="result-header">System Info</div>
+          <div id="lastResultText" class="result-body">Waiting for status...</div>
+        </div>
+
+        <details class="advanced-section">
+          <summary>Failsafe / Advanced Controls</summary>
+          <div class="advanced-grid">
+            <button class="action-btn mini" data-cmd="clockin">Clock In</button>
+            <button class="action-btn mini" data-cmd="clockout">Clock Out</button>
+            <button class="action-btn mini" data-cmd="refresh">Soft Refresh</button>
+            <button class="action-btn mini danger" data-cmd="hardreset">Hard Reset</button>
+          </div>
+        </details>
+      </div>
+    </section>
+
+    <!-- HISTORY TAB -->
+    <section class="tab-content" id="history">
+      <div class="card">
+        <h2>Response History</h2>
+        <div id="historyList" class="history-list"></div>
+      </div>
+    </section>
+
+    <!-- SKIPS TAB -->
+    <section class="tab-content" id="skips">
+      <div class="card">
+        <h2>Skip Days</h2>
+        <p class="subtext">
+          Tap a date to toggle skip. Skipped days are shown in blue.
+        </p>
+        <div id="skipCalendar"></div>
+      </div>
+    </section>
+  </div>
 
   <!-- Toasts -->
   <div id="toastContainer"></div>
@@ -119,4 +129,5 @@
     }
   </script>
 </body>
+
 </html>

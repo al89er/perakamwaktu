@@ -14,6 +14,10 @@ let calSwipeDir = null; // 'left' or 'right' or null
 let touchStartX = 0;
 let touchStartY = 0;
 
+// Auto-refresh config
+let lastStatusCheck = 0;
+const AUTO_REFRESH_COOLDOWN = 60000; // 1 minute
+
 /* ------------------------------
    INIT
 ------------------------------ */
@@ -38,7 +42,22 @@ document.addEventListener("DOMContentLoaded", () => {
   } catch (e) {
     console.error("initSupabase failed:", e);
   }
+
+  initPullToRefresh();
+
+  // Auto-refresh on visibility change
+  document.addEventListener("visibilitychange", handleVisibilityChange);
 });
+
+function handleVisibilityChange() {
+  if (document.visibilityState === "visible") {
+    const now = Date.now();
+    if (now - lastStatusCheck > AUTO_REFRESH_COOLDOWN) {
+      console.log("Auto-triggering status check...");
+      sendCommand("status");
+    }
+  }
+}
 
 /* ------------------------------
    SUPABASE INIT
@@ -258,7 +277,7 @@ function updateProofFromText(text) {
    LAST COMMAND RESULT BANNER
 ------------------------------ */
 function updateLastResult(text, timestamp) {
-  const box = document.getElementById("lastResult");
+  const box = document.querySelector(".last-result-v2") || document.getElementById("lastResult");
   const msgEl = document.getElementById("lastResultText");
   if (!box || !msgEl) return;
 
@@ -276,6 +295,10 @@ function updateLastResult(text, timestamp) {
   box.classList.remove("updated");
   void box.offsetWidth; // force reflow
   box.classList.add("updated");
+
+  if (text.toLowerCase().includes("status") || text.includes("Proof")) {
+    lastStatusCheck = Date.now();
+  }
 }
 
 /* ------------------------------
@@ -298,88 +321,50 @@ function showToast(type, text) {
 }
 
 /* ------------------------------
-   TABS + SWIPE (FIXED & SAFE)
+   TABS + NATIVE SWIPE
 ------------------------------ */
 function initTabs() {
-  const getTabs = () => Array.from(document.querySelectorAll(".tab"));
+  const viewport = document.getElementById("tabsViewport");
+  const tabs = Array.from(document.querySelectorAll(".tab"));
+  const tabContents = Array.from(document.querySelectorAll(".tab-content"));
 
-  function activateTab(targetIndex) {
-    const tabs = getTabs();
-    if (tabs.length === 0) return;
+  if (!viewport || tabs.length === 0) return;
 
-    // Elegant clamping
-    const safeIndex = Math.max(0, Math.min(targetIndex, tabs.length - 1));
-
-    tabs.forEach((t, i) => {
-      const isActive = i === safeIndex;
-      t.classList.toggle("active", isActive);
-
-      const targetId = t.dataset.tab;
-      const contentEl = document.getElementById(targetId);
-      if (contentEl) contentEl.classList.toggle("active", isActive);
+  // 1. CLICK TO NAVIGATE
+  tabs.forEach((tab, index) => {
+    tab.addEventListener("click", () => {
+      // Smooth scroll to the content
+      viewport.scrollTo({
+        left: viewport.offsetWidth * index,
+        behavior: "smooth"
+      });
     });
-  }
+  });
 
-  // Event Delegation
-  const tabContainer = document.querySelector(".tabs");
-  if (tabContainer) {
-    tabContainer.addEventListener("click", (e) => {
-      const clickedTab = e.target.closest(".tab");
-      if (!clickedTab) return;
+  // 2. SYNC TABS ON SCROLL (INTERSECTION OBSERVER)
+  const observerOptions = {
+    root: viewport,
+    threshold: 0.6 // Update when 60% of the tab is visible
+  };
 
-      const tabs = getTabs();
-      const index = tabs.indexOf(clickedTab);
-      if (index !== -1) activateTab(index);
-    });
-  }
-
-  // Init
-  const tabs = getTabs();
-  if (tabs.length > 0) {
-    const activeIndex = tabs.findIndex((t) => t.classList.contains("active"));
-    activateTab(activeIndex === -1 ? 0 : activeIndex);
-  }
-
-  // Swipe
-  const swipeTarget = document.body;
-  let touchStartX = 0;
-  let touchStartY = 0;
-  let touchActive = false;
-
-  swipeTarget.addEventListener(
-    "touchstart",
-    (e) => {
-      if (e.touches.length !== 1) return;
-      touchStartX = e.touches[0].clientX;
-      touchStartY = e.touches[0].clientY;
-      touchActive = true;
-    },
-    { passive: true }
-  );
-
-  swipeTarget.addEventListener(
-    "touchend",
-    (e) => {
-      if (!touchActive) return;
-      touchActive = false;
-      if (e.changedTouches.length !== 1) return;
-
-      const dx = e.changedTouches[0].clientX - touchStartX;
-      const dy = e.changedTouches[0].clientY - touchStartY;
-
-      if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy)) return;
-
-      const currentTabs = getTabs();
-      const currentIndex = currentTabs.findIndex((t) => t.classList.contains("active"));
-
-      if (dx < 0) {
-        activateTab(currentIndex + 1);
-      } else {
-        activateTab(currentIndex - 1);
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach((entry) => {
+      if (entry.isIntersecting) {
+        const index = tabContents.indexOf(entry.target);
+        if (index !== -1) {
+          updateActiveTabUI(index);
+        }
       }
-    },
-    { passive: true }
-  );
+    });
+  }, observerOptions);
+
+  tabContents.forEach(content => observer.observe(content));
+
+  function updateActiveTabUI(activeIndex) {
+    tabs.forEach((t, i) => {
+      t.classList.toggle("active", i === activeIndex);
+    });
+  }
 }
 
 /* ============================================================
@@ -610,5 +595,72 @@ async function onDayClick(ymd, cell) {
     skipDaysSet.add(ymd);
     cell.classList.add("skipped");
     showToast("info", `Skipped ${ymd}`);
+  }
+}
+
+/* ============================================================
+   PULL TO REFRESH
+   ============================================================ */
+function initPullToRefresh() {
+  let startY = 0;
+  let isPulling = false;
+  const threshold = 80;
+  const ptrElement = document.getElementById("pullToRefresh");
+  const ptrIcon = ptrElement?.querySelector(".ptr-icon");
+
+  window.addEventListener("touchstart", (e) => {
+    // Only PTR on the control tab and when at the top
+    const activeTab = document.querySelector(".tab-content.active");
+    if (!activeTab || activeTab.id !== "control") return;
+    if (window.scrollY > 5) return;
+
+    startY = e.touches[0].pageY;
+  }, { passive: true });
+
+  window.addEventListener("touchmove", (e) => {
+    if (startY === 0) return;
+
+    const y = e.touches[0].pageY;
+    const diff = y - startY;
+
+    if (diff > 20 && window.scrollY <= 0) {
+      isPulling = true;
+      document.body.classList.add("ptr-active");
+
+      const rotation = Math.min(diff * 2, 180);
+      if (ptrIcon) ptrIcon.style.transform = `rotate(${rotation}deg)`;
+
+      // Prevent scrolling while pulling deep
+      if (diff > 30 && e.cancelable) {
+        // We can't preventDefault on passive, so we use CSS touch-action if needed
+      }
+    }
+  }, { passive: true });
+
+  window.addEventListener("touchend", async (e) => {
+    if (!isPulling) return;
+
+    const y = e.changedTouches[0].pageY;
+    const diff = y - startY;
+
+    if (diff >= threshold) {
+      document.body.classList.add("ptr-loading");
+      sendCommand("status");
+
+      // Keep indicator for at least 1s for visual feedback
+      setTimeout(() => {
+        resetPTR();
+      }, 1500);
+    } else {
+      resetPTR();
+    }
+
+    startY = 0;
+    isPulling = false;
+  });
+
+  function resetPTR() {
+    document.body.classList.remove("ptr-active", "ptr-loading");
+    if (ptrIcon) ptrIcon.style.transform = "";
   }
 }
