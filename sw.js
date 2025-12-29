@@ -5,7 +5,7 @@
    - Clean up old caches on activate
 */
 
-const CACHE_VERSION = "v3"; // <-- bump this when you deploy fixes
+const CACHE_VERSION = "v4"; // <-- bump this when you deploy fixes
 const CACHE_NAME = `perakamwaktu-${CACHE_VERSION}`;
 
 // Local assets to precache (only same-origin files)
