@@ -1,6 +1,7 @@
-window.alert("Script Started");
+// Temporary debug (remove after confirmed)
+// window.alert("Script Started");
 
-let supabase = null;
+let supabaseClient = null; // <-- renamed to avoid collision with global `supabase`
 let realtimeConnected = false;
 
 // Calendar state
@@ -9,7 +10,7 @@ let calMonth = null; // 0–11
 let skipDaysSet = new Set(); // holds 'YYYY-MM-DD'
 let calSwipeDir = null; // 'left' or 'right' or null
 
-// Swipe state for tab switching
+// Swipe state for tab switching (global; initTabs has its own local swipe state too)
 let touchStartX = 0;
 let touchStartY = 0;
 
@@ -17,33 +18,58 @@ let touchStartY = 0;
    INIT
 ------------------------------ */
 document.addEventListener("DOMContentLoaded", () => {
-  // Debug Alert - You can remove this after it works
-  window.alert("Script Loaded Successfully!");
-  
-  initTabs();
-  initButtons();
-  initSupabase();
+  // Debug Alert - remove after it works
+  // window.alert("Script Loaded Successfully!");
+
+  try {
+    initTabs();
+  } catch (e) {
+    console.error("initTabs failed:", e);
+  }
+
+  try {
+    initButtons();
+  } catch (e) {
+    console.error("initButtons failed:", e);
+  }
+
+  try {
+    initSupabase();
+  } catch (e) {
+    console.error("initSupabase failed:", e);
+  }
 });
 
 /* ------------------------------
    SUPABASE INIT
 ------------------------------ */
 async function initSupabase() {
+  // CDN provides `window.supabase`
   if (!window.supabase) {
     console.error("Supabase JS not loaded");
     return;
   }
 
-  supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  // These must come from config.js (globals)
+  if (typeof SUPABASE_URL === "undefined" || typeof SUPABASE_ANON_KEY === "undefined") {
+    console.error("Missing SUPABASE_URL / SUPABASE_ANON_KEY. Check config.js.");
+    return;
+  }
+  if (typeof DEVICE_ID === "undefined") {
+    console.error("Missing DEVICE_ID. Check config.js.");
+    return;
+  }
+
+  supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
   setStatus("yellow");
 
-  // Realtime: watch UPDATE on commands, filter by device_id in JS
-  supabase
+  // Realtime: listen to both INSERT and UPDATE (more robust than UPDATE-only)
+  supabaseClient
     .channel("commands_realtime")
     .on(
       "postgres_changes",
       {
-        event: "UPDATE",
+        event: "*",
         schema: "public",
         table: "commands",
       },
@@ -74,6 +100,7 @@ function setStatus(color) {
    HANDLE SUPABASE RESPONSE (commands)
 ------------------------------ */
 function handleSupabaseEvent(payload) {
+  // payload.new exists for INSERT/UPDATE
   if (!payload.new) return;
   const r = payload.new;
 
@@ -111,14 +138,14 @@ function ripple(e) {
    SEND COMMAND TO SUPABASE (commands table)
 ------------------------------ */
 async function sendCommand(cmd) {
-  if (!supabase) {
+  if (!supabaseClient) {
     showToast("error", "Supabase not ready");
     return;
   }
 
   showToast("info", `Sent: ${cmd}`);
 
-  const { error } = await supabase.from("commands").insert({
+  const { error } = await supabaseClient.from("commands").insert({
     device_id: DEVICE_ID,
     cmd: cmd,
   });
@@ -143,14 +170,14 @@ function addHistoryEntry(text) {
 
 /* Load last 24h history + proof for today */
 async function loadInitialHistoryAndProof() {
-  if (!supabase) return;
+  if (!supabaseClient) return;
 
   const now = new Date();
   const since = new Date(now.getTime() - 24 * 60 * 60 * 1000);
   const sinceISO = since.toISOString();
   const todayYMD = formatYMD(now.getFullYear(), now.getMonth(), now.getDate());
 
-  const { data, error } = await supabase
+  const { data, error } = await supabaseClient
     .from("commands")
     .select("cmd,response,device_id,created_at")
     .eq("device_id", DEVICE_ID)
@@ -201,7 +228,7 @@ function updateProofFromText(text) {
   const isSkipped = text.includes("(SKIPPED)");
 
   if (isSkipped) {
-    // 🔘 Grey "Skipped" state
+    // Grey "Skipped" state
     elH.textContent = "Skipped";
     elK.textContent = "Skipped";
     elT.textContent = "—";
@@ -275,7 +302,6 @@ function showToast(type, text) {
 ------------------------------ */
 function initTabs() {
   const getTabs = () => Array.from(document.querySelectorAll(".tab"));
-  const getContents = () => Array.from(document.querySelectorAll(".tab-content"));
 
   function activateTab(targetIndex) {
     const tabs = getTabs();
@@ -287,7 +313,7 @@ function initTabs() {
     tabs.forEach((t, i) => {
       const isActive = i === safeIndex;
       t.classList.toggle("active", isActive);
-      
+
       const targetId = t.dataset.tab;
       const contentEl = document.getElementById(targetId);
       if (contentEl) contentEl.classList.toggle("active", isActive);
@@ -300,7 +326,7 @@ function initTabs() {
     tabContainer.addEventListener("click", (e) => {
       const clickedTab = e.target.closest(".tab");
       if (!clickedTab) return;
-      
+
       const tabs = getTabs();
       const index = tabs.indexOf(clickedTab);
       if (index !== -1) activateTab(index);
@@ -320,36 +346,44 @@ function initTabs() {
   let touchStartY = 0;
   let touchActive = false;
 
-  swipeTarget.addEventListener("touchstart", (e) => {
-    if (e.touches.length !== 1) return;
-    touchStartX = e.touches[0].clientX;
-    touchStartY = e.touches[0].clientY;
-    touchActive = true;
-  }, { passive: true });
+  swipeTarget.addEventListener(
+    "touchstart",
+    (e) => {
+      if (e.touches.length !== 1) return;
+      touchStartX = e.touches[0].clientX;
+      touchStartY = e.touches[0].clientY;
+      touchActive = true;
+    },
+    { passive: true }
+  );
 
-  swipeTarget.addEventListener("touchend", (e) => {
-    if (!touchActive) return;
-    touchActive = false;
-    if (e.changedTouches.length !== 1) return;
+  swipeTarget.addEventListener(
+    "touchend",
+    (e) => {
+      if (!touchActive) return;
+      touchActive = false;
+      if (e.changedTouches.length !== 1) return;
 
-    const dx = e.changedTouches[0].clientX - touchStartX;
-    const dy = e.changedTouches[0].clientY - touchStartY;
-    
-    if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy)) return;
+      const dx = e.changedTouches[0].clientX - touchStartX;
+      const dy = e.changedTouches[0].clientY - touchStartY;
 
-    const currentTabs = getTabs();
-    const currentIndex = currentTabs.findIndex(t => t.classList.contains("active"));
-    
-    if (dx < 0) {
-      activateTab(currentIndex + 1);
-    } else {
-      activateTab(currentIndex - 1);
-    }
-  }, { passive: true });
+      if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy)) return;
+
+      const currentTabs = getTabs();
+      const currentIndex = currentTabs.findIndex((t) => t.classList.contains("active"));
+
+      if (dx < 0) {
+        activateTab(currentIndex + 1);
+      } else {
+        activateTab(currentIndex - 1);
+      }
+    },
+    { passive: true }
+  );
 }
 
 /* ============================================================
-   SKIP CALENDAR (One UI 8 style)
+   SKIP CALENDAR
 =============================================================== */
 
 /* Helper: format YYYY-MM-DD in local time */
@@ -383,19 +417,15 @@ function initCalendar() {
     <div class="calendar-grid" id="calGrid"></div>
   `;
 
-  document
-    .getElementById("calPrevBtn")
-    .addEventListener("click", () => {
-      calSwipeDir = "right"; 
-      changeMonth(-1);
-    });
+  document.getElementById("calPrevBtn").addEventListener("click", () => {
+    calSwipeDir = "right";
+    changeMonth(-1);
+  });
 
-  document
-    .getElementById("calNextBtn")
-    .addEventListener("click", () => {
-      calSwipeDir = "left"; 
-      changeMonth(1);
-    });
+  document.getElementById("calNextBtn").addEventListener("click", () => {
+    calSwipeDir = "left";
+    changeMonth(1);
+  });
 
   const grid = document.getElementById("calGrid");
   if (grid) {
@@ -437,7 +467,7 @@ function renderCalendarGridSkeleton() {
 
 /* Load skip_days for the visible month */
 async function loadSkipDaysForCurrentMonth() {
-  if (!supabase) return;
+  if (!supabaseClient) return;
 
   const title = document.getElementById("calTitle");
   if (title) {
@@ -452,7 +482,7 @@ async function loadSkipDaysForCurrentMonth() {
   const startStr = formatYMD(calYear, calMonth, 1);
   const endStr = formatYMD(calYear, calMonth, daysInMonth);
 
-  const { data, error } = await supabase
+  const { data, error } = await supabaseClient
     .from("skip_days")
     .select("day")
     .eq("device_id", DEVICE_ID)
@@ -526,7 +556,7 @@ function renderCalendar() {
   }
 
   grid.classList.remove("slide-left", "slide-right", "fade-in");
-  void grid.offsetWidth; 
+  void grid.offsetWidth;
 
   if (calSwipeDir === "left") {
     grid.classList.add("slide-left");
@@ -540,7 +570,7 @@ function renderCalendar() {
 
 /* Click handler: toggle skip for a date */
 async function onDayClick(ymd, cell) {
-  if (!supabase) {
+  if (!supabaseClient) {
     showToast("error", "Supabase not ready");
     return;
   }
@@ -549,7 +579,7 @@ async function onDayClick(ymd, cell) {
 
   if (isSkipped) {
     // Unskip
-    const { error } = await supabase
+    const { error } = await supabaseClient
       .from("skip_days")
       .delete()
       .eq("device_id", DEVICE_ID)
@@ -566,7 +596,7 @@ async function onDayClick(ymd, cell) {
     showToast("info", `Unskipped ${ymd}`);
   } else {
     // Skip
-    const { error } = await supabase.from("skip_days").upsert({
+    const { error } = await supabaseClient.from("skip_days").upsert({
       device_id: DEVICE_ID,
       day: ymd,
     });
