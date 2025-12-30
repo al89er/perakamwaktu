@@ -99,6 +99,20 @@ async function initSupabase() {
       setStatus(realtimeConnected ? "green" : "yellow");
     });
 
+  // Realtime: listen to attendance_logs
+  supabaseClient
+    .channel("logs_realtime")
+    .on(
+      "postgres_changes",
+      {
+        event: "*",
+        schema: "public",
+        table: "attendance_logs",
+      },
+      handleLogEvent
+    )
+    .subscribe();
+
   // Load last 24h history + proof on startup
   await loadInitialHistoryAndProof();
 
@@ -119,18 +133,30 @@ function setStatus(color) {
    HANDLE SUPABASE RESPONSE (commands)
 ------------------------------ */
 function handleSupabaseEvent(payload) {
-  // payload.new exists for INSERT/UPDATE
   if (!payload.new) return;
   const r = payload.new;
 
-  // Ignore other devices
   if (r.device_id && r.device_id !== DEVICE_ID) return;
   if (!r.response) return;
 
   addHistoryEntry(r.response);
   showToast("info", r.response);
-  updateProofFromText(r.response);
   updateLastResult(r.response, r.updated_at || r.created_at);
+}
+
+/* ------------------------------
+   HANDLE LOG EVENT (attendance_logs)
+------------------------------ */
+function handleLogEvent(payload) {
+  if (!payload.new) return;
+  const log = payload.new;
+
+  if (log.device_id && log.device_id !== DEVICE_ID) return;
+
+  const todayYMD = formatYMD(new Date().getFullYear(), new Date().getMonth(), new Date().getDate());
+  if (log.day === todayYMD) {
+    updateProofDisplay(log.clock_in, log.clock_out, log.updated_at);
+  }
 }
 
 /* ------------------------------
@@ -221,13 +247,22 @@ async function loadInitialHistoryAndProof() {
     updateLastResult(latest.response, latest.created_at);
   }
 
-  // Proof: newest row for TODAY that has "Proof"
-  for (const row of data) {
-    if (!row.response || !row.response.includes("Proof")) continue;
-    const rowYMD = ymdFromTimestamp(row.created_at);
-    if (rowYMD === todayYMD) {
-      updateProofFromText(row.response);
-      break;
+  // --- FETCH ATTENDANCE LOG FOR TODAY ---
+  const { data: logData, error: logError } = await supabaseClient
+    .from("attendance_logs")
+    .select("clock_in, clock_out, updated_at")
+    .eq("device_id", DEVICE_ID)
+    .eq("day", todayYMD)
+    .maybeSingle();
+
+  if (logError) {
+    console.error("Failed to load log:", logError);
+  } else if (logData) {
+    updateProofDisplay(logData.clock_in, logData.clock_out, logData.updated_at);
+  } else {
+    // If no log entry, check if the day is marked as skipped in local set
+    if (skipDaysSet.has(todayYMD)) {
+      updateProofDisplay("Skipped", "Skipped", null, true);
     }
   }
 }
@@ -236,6 +271,23 @@ async function loadInitialHistoryAndProof() {
    PROOF PANEL UPDATE
 ------------------------------ */
 function updateProofFromText(text) {
+  // Legacy support for real-time legacy responses, 
+  // but we prefer updateProofDisplay for clean data.
+  if (text.includes("(SKIPPED)")) {
+    updateProofDisplay("Skipped", "Skipped", null, true);
+    return;
+  }
+
+  if (!text.includes("Proof")) return;
+
+  const h = text.match(/Hadir=([^ ]+)/);
+  const k = text.match(/Keluar=([^ )]+)/);
+  const t = text.match(/captured ([0-9:AMP]+)/i);
+
+  updateProofDisplay(h ? h[1] : "—", k ? k[1] : "—", t ? t[1] : null);
+}
+
+function updateProofDisplay(hadir, keluar, updatedAt, forceSkipped = false) {
   const elH = document.getElementById("proofHadir");
   const elK = document.getElementById("proofKeluar");
   const elT = document.getElementById("proofUpdated");
@@ -244,33 +296,38 @@ function updateProofFromText(text) {
 
   if (!elH || !elK || !elT) return;
 
-  const isSkipped = text.includes("(SKIPPED)");
+  const isSkipped = forceSkipped || (hadir === "Skipped" && keluar === "Skipped");
 
   if (isSkipped) {
-    // Grey "Skipped" state
     elH.textContent = "Skipped";
     elK.textContent = "Skipped";
     elT.textContent = "—";
-
     if (cardMasuk) cardMasuk.classList.add("skipped");
     if (cardKeluar) cardKeluar.classList.add("skipped");
     return;
   }
 
-  // Not skipped → normal proof. Remove any previous skipped styling
   if (cardMasuk) cardMasuk.classList.remove("skipped");
   if (cardKeluar) cardKeluar.classList.remove("skipped");
 
-  // For non-skipped days, only update if the response has Proof block
-  if (!text.includes("Proof")) return;
+  elH.textContent = hadir || "—";
+  elK.textContent = keluar || "—";
 
-  const h = text.match(/Hadir=([^ ]+)/);
-  const k = text.match(/Keluar=([^ )]+)/);
-  const t = text.match(/captured ([0-9:AMP]+)/i);
-
-  elH.textContent = h ? h[1] : "—";
-  elK.textContent = k ? k[1] : "—";
-  elT.textContent = t ? t[1] : "—";
+  if (updatedAt) {
+    try {
+      // If it's a full timestamp or just a time string
+      if (updatedAt.includes("T") || updatedAt.includes("-")) {
+        const dt = new Date(updatedAt);
+        elT.textContent = dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      } else {
+        elT.textContent = updatedAt;
+      }
+    } catch {
+      elT.textContent = updatedAt;
+    }
+  } else {
+    elT.textContent = "—";
+  }
 }
 
 /* ------------------------------
