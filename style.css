@@ -245,9 +245,10 @@ body {
 }
 
 .proof-time {
-  font-size: 28px;
+  font-size: 22px;
   font-weight: 700;
   margin-bottom: 6px;
+  white-space: nowrap;
 }
 
 .proof-title {
