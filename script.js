@@ -338,17 +338,62 @@ function updateLastResult(text, timestamp) {
   const msgEl = document.getElementById("lastResultText");
   if (!box || !msgEl) return;
 
-  let suffix = "";
-  if (timestamp) {
-    try {
-      const dt = new Date(timestamp);
-      suffix = " · " + dt.toLocaleTimeString();
-    } catch {
-      // ignore parse errors
+  if (text.includes("|")) {
+    const parts = text.split("|").map(p => p.trim());
+    let html = "";
+
+    // 1. Date
+    if (parts[0]) {
+      html += `<div class="result-line">${parts[0]}</div>`;
     }
+
+    // 2. Scheduled Times
+    if (parts[1]) {
+      const val = parts[1].replace(/^In:\s*/, "");
+      html += `<div class="result-line"><strong>Scheduled Time In:</strong> ${val}</div>`;
+    }
+    if (parts[2]) {
+      const val = parts[2].replace(/^Out:\s*/, "");
+      html += `<div class="result-line"><strong>Scheduled Time Out:</strong> ${val}</div>`;
+    }
+
+    // 3. Proof Times
+    if (parts[3]) {
+      const proofPart = parts[3].replace(/^Masa Proof:\s*/, "").trim();
+      const subParts = proofPart.split(",").map(s => s.trim());
+      subParts.forEach(sp => {
+        if (sp.startsWith("Hadir=")) {
+          html += `<div class="result-line"><strong>Proof Time In:</strong> ${sp.replace("Hadir=", "")}</div>`;
+        } else if (sp.startsWith("Keluar=")) {
+          html += `<div class="result-line"><strong>Proof Time Out:</strong> ${sp.replace("Keluar=", "")}</div>`;
+        } else if (sp) {
+          html += `<div class="result-line">${sp}</div>`;
+        }
+      });
+    }
+
+    // 4. Timestamp
+    if (timestamp) {
+      try {
+        const dt = new Date(timestamp);
+        const timeStr = dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        html += `<div class="result-timestamp"><strong>Timestamp:</strong> ${timeStr}</div>`;
+      } catch (e) { }
+    }
+
+    msgEl.innerHTML = html;
+  } else {
+    // Basic text result
+    let suffix = "";
+    if (timestamp) {
+      try {
+        const dt = new Date(timestamp);
+        suffix = " · " + dt.toLocaleTimeString();
+      } catch { }
+    }
+    msgEl.textContent = text + (suffix || "");
   }
 
-  msgEl.textContent = text + (suffix || "");
   box.classList.remove("updated");
   void box.offsetWidth; // force reflow
   box.classList.add("updated");
